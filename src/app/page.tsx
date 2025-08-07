@@ -1,103 +1,160 @@
+"use client";
+import React, { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
+import logoWW from "../../public/logoWW.svg";
+import ButtonDemo from "@/components/ButtonDemo";
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+// Lazy loading do Spline conforme documentação oficial
+const Spline = React.lazy(() => import("@splinetool/react-spline"));
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+const Home = () => {
+  const [isSplineLoaded, setIsSplineLoaded] = useState(false);
+  const [showContent, setShowContent] = useState(false);
+
+  // Timeout de segurança - sempre remove o loading após 6 segundos
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      console.log("Timeout: Removendo loading após 6 segundos");
+      setIsSplineLoaded(true);
+      setShowContent(true);
+    }, 6000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleSplineLoad = () => {
+    console.log("Spline carregado com sucesso!");
+    setIsSplineLoaded(true);
+    // Pequeno delay para transição suave
+    setTimeout(() => setShowContent(true), 500);
+  };
+
+  const handleSplineError = (error) => {
+    console.error("Erro no Spline:", error);
+    setIsSplineLoaded(true);
+    setShowContent(true);
+  };
+
+  // Loading Component customizado
+  const SplineLoadingFallback = () => (
+    <div className="w-full h-full flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-white/60 text-sm">Carregando cena 3D...</p>
+      </div>
     </div>
   );
-}
+
+  return (
+    <main className="h-screen w-full relative overflow-hidden">
+      {/* Loading Screen Principal */}
+      {!showContent && (
+        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="mb-8">
+              <Image
+                src={logoWW}
+                alt="Tivius Logo"
+                className="mx-auto drop-shadow-2xl animate-pulse"
+                width={200}
+                height={80}
+                priority
+                style={{ width: "auto", height: "auto" }}
+              />
+            </div>
+
+            <div className="relative mb-6">
+              <div className="w-16 h-16 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
+              <div
+                className="absolute inset-0 w-16 h-16 border-4 border-transparent border-r-purple-400 rounded-full animate-spin mx-auto"
+                style={{
+                  animationDirection: "reverse",
+                  animationDuration: "3s",
+                }}
+              ></div>
+            </div>
+
+            <p className="text-white/80 text-sm animate-pulse mb-2">
+              Carregando experiência...
+            </p>
+
+            <div className="w-64 h-1 bg-gray-700 rounded-full mx-auto overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Conteúdo Principal */}
+      <div
+        className={`absolute w-full top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 transition-all duration-1000 ${
+          showContent ? "opacity-100 scale-100" : "opacity-0 scale-95"
+        }`}
+      >
+        <div className="max-w-2xl mx-auto px-6">
+          <Image
+            src={logoWW}
+            alt="Tivius Logo"
+            className="mx-auto mb-8 drop-shadow-2xl"
+            width={200}
+            height={80}
+            priority
+            style={{ width: "auto", height: "auto" }}
+          />
+
+          <h1 className="text-2xl text-center font-light mb-4 text-white">
+            Streaming de outro mundo
+          </h1>
+
+          <p className="text-sm text-center mx-3 mb-8 text-white/80 leading-relaxed">
+            Entretenimento sem fronteiras com qualidade 4K que vai te
+            surpreender.
+          </p>
+
+          <div className="flex justify-center items-center gap-8 mb-8 flex-wrap">
+            <div className="text-center">
+              <div className="text-xl font-bold text-purple-500">10.000+</div>
+              <div className="text-xs text-white/60">Conteúdos</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-purple-500">4K</div>
+              <div className="text-xs text-white/60">Ultra HD</div>
+            </div>
+            <div className="text-center">
+              <div className="text-[18px] font-bold text-purple-500">
+                Suporte
+              </div>
+              <div className="text-xs text-white/60">24/7</div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
+            <ButtonDemo />
+          </div>
+
+          <div className="absolute left-1/2 transform -translate-x-1/2 z-10 text-white/30 text-xs animate-bounce">
+            ↓ Descubra mais
+          </div>
+        </div>
+      </div>
+
+      {/* Spline Scene com Suspense */}
+      <div className="absolute inset-0 w-full h-full">
+        <Suspense fallback={<SplineLoadingFallback />}>
+          <Spline
+            scene="https://prod.spline.design/eUkvWftj5fIwwZQq/scene.splinecode"
+            onLoad={handleSplineLoad}
+            onError={handleSplineError}
+            style={{
+              width: "100%",
+              height: "100%",
+              zIndex: 0,
+            }}
+          />
+        </Suspense>
+      </div>
+    </main>
+  );
+};
+
+export default Home;

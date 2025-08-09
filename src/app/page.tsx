@@ -1,159 +1,130 @@
 "use client";
-import React, { useState, useEffect, Suspense } from "react";
-import Image from "next/image";
-import logoWW from "../../public/logoWW.svg";
-import ButtonDemo from "@/components/ButtonDemo";
 
-// Lazy loading do Spline conforme documentação oficial
-const Spline = React.lazy(() => import("@splinetool/react-spline"));
+import Head from "next/head";
+import HeroSectionPlanet from "@/components/HeroPlanet";
+import FloatingGlassCardsSection from "@/components/WhyTivius";
+import GalaxyBackground from "@/components/ui/galaxyBackground";
+import AnimatedStatsSection from "@/components/ui/animatedStatsSection";
+import TestimonialsSection from "@/components/TestimonialSection";
+import TiviusFAQ from "@/components/TiviusFaq";
 
 const Home = () => {
-  const [isSplineLoaded, setIsSplineLoaded] = useState(false);
-  const [showContent, setShowContent] = useState(false);
-
-  // Timeout de segurança - sempre remove o loading após 6 segundos
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      console.log("Timeout: Removendo loading após 6 segundos");
-      setIsSplineLoaded(true);
-      setShowContent(true);
-    }, 6000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  const handleSplineLoad = () => {
-    console.log("Spline carregado com sucesso!");
-    setIsSplineLoaded(true);
-    // Pequeno delay para transição suave
-    setTimeout(() => setShowContent(true), 500);
+  const organizationStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Tivius",
+    description:
+      "Streaming premium 4K com catálogo completo, sem contrato e sem burocracia. O futuro do entretenimento digital.",
+    url: "https://seudominio.com.br",
+    logo: "/images/logo.png",
+    foundingDate: "2023",
+    contactPoint: {
+      "@type": "ContactPoint",
+      telephone: "+55-11-98578-9062",
+      contactType: "customer service",
+      availableLanguage: "Portuguese",
+    },
+    address: {
+      "@type": "PostalAddress",
+      addressCountry: "BR",
+      addressRegion: "SP",
+      addressLocality: "São Paulo",
+    },
   };
-
-  const handleSplineError = (error) => {
-    console.error("Erro no Spline:", error);
-    setIsSplineLoaded(true);
-    setShowContent(true);
-  };
-
-  // Loading Component customizado
-  const SplineLoadingFallback = () => (
-    <div className="w-full h-full flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-white/60 text-sm">Carregando cena 3D...</p>
-      </div>
-    </div>
-  );
 
   return (
-    <main className="h-screen w-full relative overflow-hidden">
-      {/* Loading Screen Principal */}
-      {!showContent && (
-        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="mb-8">
-              <Image
-                src={logoWW}
-                alt="Tivius Logo"
-                className="mx-auto drop-shadow-2xl animate-pulse"
-                width={200}
-                height={80}
-                priority
-                style={{ width: "auto", height: "auto" }}
-              />
-            </div>
+    <>
+      <Head>
+        <title>
+          Tivius - Streaming Premium 4K | Sem Contrato, Sem Burocracia
+        </title>
+        <meta
+          name="description"
+          content="🚀 A revolução do streaming chegou! Qualidade 4K real, catálogo gigantesco, instalação em segundos. Teste GRÁTIS agora! Sem contrato, sem CPF, sem complicação."
+        />
+        <meta charSet="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="author" content="Tivius" />
+        <link rel="canonical" href="https://seudominio.com.br" />
 
-            <div className="relative mb-6">
-              <div className="w-16 h-16 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
-              <div
-                className="absolute inset-0 w-16 h-16 border-4 border-transparent border-r-purple-400 rounded-full animate-spin mx-auto"
-                style={{
-                  animationDirection: "reverse",
-                  animationDuration: "3s",
-                }}
-              ></div>
-            </div>
+        {/* Open Graph */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://seudominio.com.br" />
+        <meta
+          property="og:title"
+          content="Tivius - Streaming Premium 4K | Teste Grátis Agora!"
+        />
+        <meta
+          property="og:description"
+          content="🎬 Streaming premium com qualidade 4K, catálogo gigantesco e zero burocracia! Funciona em qualquer dispositivo. Teste grátis e comprove!"
+        />
+        <meta property="og:image" content="/images/og-image.jpg" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta
+          property="og:image:alt"
+          content="Tivius Streaming - Qualidade 4K Premium"
+        />
+        <meta property="og:site_name" content="Tivius" />
+        <meta property="og:locale" content="pt_BR" />
 
-            <p className="text-white/80 text-sm animate-pulse mb-2">
-              Carregando experiência...
-            </p>
+        {/* Twitter Cards */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content="https://seudominio.com.br" />
+        <meta
+          name="twitter:title"
+          content="Tivius - Streaming Premium 4K | Teste Grátis!"
+        />
+        <meta
+          name="twitter:description"
+          content="🚀 A revolução do streaming! Qualidade 4K, sem contrato, sem burocracia. Teste grátis agora!"
+        />
+        <meta name="twitter:image" content="/images/twitter-image.jpg" />
+        <meta
+          name="twitter:image:alt"
+          content="Tivius - Streaming Premium 4K"
+        />
 
-            <div className="w-64 h-1 bg-gray-700 rounded-full mx-auto overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full animate-pulse"></div>
-            </div>
-          </div>
-        </div>
-      )}
+        {/* Favicons */}
+        <link rel="icon" href="/favicon.ico" sizes="any" />
 
-      {/* Conteúdo Principal */}
-      <div
-        className={`absolute w-full top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 transition-all duration-1000 ${
-          showContent ? "opacity-100 scale-100" : "opacity-0 scale-95"
-        }`}
-      >
-        <div className="max-w-2xl mx-auto px-6">
-          <Image
-            src={logoWW}
-            alt="Tivius Logo"
-            className="mx-auto mb-8 drop-shadow-2xl"
-            width={200}
-            height={80}
-            priority
-            style={{ width: "auto", height: "auto" }}
-          />
+        {/* Hreflang */}
+        <link
+          rel="alternate"
+          hrefLang="pt-br"
+          href="https://seudominio.com.br"
+        />
+        <link
+          rel="alternate"
+          hrefLang="x-default"
+          href="https://seudominio.com.br"
+        />
 
-          <h1 className="text-2xl text-center font-light mb-4 text-white">
-            Streaming de outro mundo
-          </h1>
+        {/* Organization Structured Data */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(organizationStructuredData),
+          }}
+        />
+      </Head>
 
-          <p className="text-sm text-center mx-3 mb-8 text-white/80 leading-relaxed">
-            Entretenimento sem fronteiras com qualidade 4K que vai te
-            surpreender.
-          </p>
-
-          <div className="flex justify-center items-center gap-8 mb-8 flex-wrap">
-            <div className="text-center">
-              <div className="text-xl font-bold text-purple-500">10.000+</div>
-              <div className="text-xs text-white/60">Conteúdos</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xl font-bold text-purple-500">4K</div>
-              <div className="text-xs text-white/60">Ultra HD</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[18px] font-bold text-purple-500">
-                Suporte
-              </div>
-              <div className="text-xs text-white/60">24/7</div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
-            <ButtonDemo />
-          </div>
-
-          <div className="absolute left-1/2 transform -translate-x-1/2 z-10 text-white/30 text-xs animate-bounce">
-            ↓ Descubra mais
-          </div>
-        </div>
-      </div>
-
-      {/* Spline Scene com Suspense */}
-      <div className="absolute inset-0 w-full h-full">
-        <Suspense fallback={<SplineLoadingFallback />}>
-          <Spline
-            scene="https://prod.spline.design/eUkvWftj5fIwwZQq/scene.splinecode"
-            onLoad={handleSplineLoad}
-            onError={handleSplineError}
-            style={{
-              width: "100%",
-              height: "100%",
-              zIndex: 0,
-            }}
-          />
-        </Suspense>
-      </div>
-    </main>
+      <main role="main">
+        <HeroSectionPlanet />
+        <section
+          className="relative"
+          role="region"
+          aria-label="Conteúdo principal"
+        >
+          <GalaxyBackground>
+            <FloatingGlassCardsSection />
+            <AnimatedStatsSection />
+            <TestimonialsSection />
+            <TiviusFAQ />
+          </GalaxyBackground>
+        </section>
+      </main>
+    </>
   );
 };
 

@@ -117,6 +117,7 @@
   --animate-neon-slide-down: neonSlideDown 2s linear infinite;
   --animate-neon-slide-left: neonSlideLeft 2s linear infinite;
   --animate-neon-slide-up: neonSlideUp 2s linear infinite;
+  --tw-gradient-animation: gradient 8s ease infinite;
 
   @keyframes neonSlideRight {
     0% {
@@ -149,6 +150,31 @@
     100% {
       transform: translateY(-100%);
     }
+  }
+
+  --animate-blink: blink 2s linear infinite;
+
+  @keyframes blink {
+    50% {
+      opacity: 0.6;
+    }
+  }
+}
+
+@layer utilities {
+  @keyframes gradient {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+  .animate-gradient {
+    animation: var(--tw-gradient-animation);
   }
 }
 

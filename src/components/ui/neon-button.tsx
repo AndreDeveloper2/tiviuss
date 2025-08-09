@@ -31,8 +31,11 @@ export function NeonButton({
 
   return (
     <a
+      href="https://wa.me/message/PSY2AFAH667GL1"
+      target="_blank"
+      rel="noopener noreferrer"
       className={cn(
-        "relative overflow-hidden px-8 py-3 text-sm rounded-[4px] uppercase tracking-[5px] no-underline shadow-[0_20px_50px_rgba(0,0,0,0.5)]",
+        "relative overflow-hidden px-8 py-3 text-sm rounded-[4px] cursor-pointer uppercase tracking-[5px] no-underline shadow-[0_20px_50px_rgba(0,0,0,0.5)]",
         "bg-[var(--bg-color)] text-[var(--text-color)]",
         className
       )}

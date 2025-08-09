@@ -7,7 +7,7 @@ import ButtonDemo from "@/components/ButtonDemo";
 const Spline = React.lazy(() => import("@splinetool/react-spline"));
 
 const HeroSectionPlanet = () => {
-  const [isSplineLoaded, setIsSplineLoaded] = useState(false);
+  const [, setIsSplineLoaded] = useState(false);
   const [showContent, setShowContent] = useState(false);
 
   useEffect(() => {
@@ -24,7 +24,7 @@ const HeroSectionPlanet = () => {
     setTimeout(() => setShowContent(true), 500);
   };
 
-  const handleSplineError = (error) => {
+  const handleSplineError = () => {
     setIsSplineLoaded(true);
     setShowContent(true);
   };

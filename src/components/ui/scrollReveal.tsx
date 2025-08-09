@@ -46,7 +46,7 @@ const ScrollReveal: React.FC<ScrollRevealProps> = ({
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    z;
+
     const scroller =
       scrollContainerRef && scrollContainerRef.current
         ? scrollContainerRef.current

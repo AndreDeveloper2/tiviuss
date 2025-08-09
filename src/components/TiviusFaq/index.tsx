@@ -1,14 +1,28 @@
 import React, { useState, useEffect } from "react";
 import ButtonTest from "../ButtonTest";
 
+interface Star {
+  id: number;
+  left: number;
+  top: number;
+  size: number;
+  delay: number;
+}
+
+interface Particle {
+  id: number;
+  left: number;
+  size: number;
+}
+
 const TiviusFAQ = () => {
-  const [openItem, setOpenItem] = useState(null);
-  const [stars, setStars] = useState([]);
-  const [particles, setParticles] = useState([]);
+  const [openItem, setOpenItem] = useState<number | null>(null);
+  const [stars, setStars] = useState<Star[]>([]);
+  const [particles, setParticles] = useState<Particle[]>([]);
 
   // Criar estrelas de fundo
   useEffect(() => {
-    const newStars = [];
+    const newStars: Star[] = [];
     for (let i = 0; i < 80; i++) {
       newStars.push({
         id: i,
@@ -24,7 +38,7 @@ const TiviusFAQ = () => {
   // Criar partículas flutuantes
   useEffect(() => {
     const interval = setInterval(() => {
-      const newParticle = {
+      const newParticle: Particle = {
         id: Date.now(),
         left: Math.random() * 100,
         size: Math.random() * 4 + 2,
@@ -108,7 +122,7 @@ const TiviusFAQ = () => {
     },
   ];
 
-  const toggleItem = (id) => {
+  const toggleItem = (id: number) => {
     setOpenItem(openItem === id ? null : id);
   };
 
@@ -512,7 +526,7 @@ const TiviusFAQ = () => {
             role="list"
             aria-label="Lista de perguntas frequentes"
           >
-            {faqItems.map((item, index) => (
+            {faqItems.map((item) => (
               <article
                 key={item.id}
                 className={`faq-item ${openItem === item.id ? "open" : ""}`}

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import ButtonDemo from "../ButtonDemo";
 import ButtonCallAction from "../ButtonCallAction";
 
 // Hook para animação de números

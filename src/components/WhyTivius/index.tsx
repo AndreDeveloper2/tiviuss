@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import GradientText from "../ui/gradientText";
+import Image from "next/image";
 
 // Simulação do ScrollReveal
 const ScrollReveal = ({ children, className = "", delay = 0 }) => {
@@ -69,10 +69,12 @@ const FloatingImage = ({ imageUrl, title, category, position = "left" }) => {
       {/* Main Image Container */}
       <div className="relative aspect-video rounded-2xl lg:rounded-3xl overflow-hidden shadow-2xl">
         {/* Content Image */}
-        <img
+        <Image
           src={imageUrl}
           alt={`${title || category} - Streaming 4K Tivius`}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          fill
+          style={{ objectFit: "cover" }}
+          className="transition-transform duration-500 group-hover:scale-110"
         />
 
         {/* Subtle overlay for better text readability */}

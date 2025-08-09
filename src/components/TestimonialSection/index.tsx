@@ -1,12 +1,27 @@
 import React, { useEffect, useState } from "react";
 
+interface Star {
+  id: number;
+  left: number;
+  top: number;
+  size: number;
+  delay: number;
+}
+
+interface Particle {
+  id: number;
+  left: number;
+  size: number;
+  delay: number;
+}
+
 const TestimonialsSection = () => {
-  const [stars, setStars] = useState([]);
-  const [particles, setParticles] = useState([]);
+  const [stars, setStars] = useState<Star[]>([]);
+  const [particles, setParticles] = useState<Particle[]>([]);
 
   // Criar estrelas de fundo
   useEffect(() => {
-    const newStars = [];
+    const newStars: Star[] = [];
     for (let i = 0; i < 100; i++) {
       newStars.push({
         id: i,
@@ -22,7 +37,7 @@ const TestimonialsSection = () => {
   // Criar partículas flutuantes
   useEffect(() => {
     const interval = setInterval(() => {
-      const newParticle = {
+      const newParticle: Particle = {
         id: Date.now(),
         left: Math.random() * 100,
         size: Math.random() * 6 + 2,

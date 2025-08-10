@@ -159,6 +159,32 @@
       opacity: 0.6;
     }
   }
+
+  /* Adicione esta animação ao seu arquivo globals.css ou tailwind.css */
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: perspective(1200px) rotateX(8deg) rotateY(-8deg)
+        translateY(0px);
+    }
+    25% {
+      transform: perspective(1200px) rotateX(5deg) rotateY(-5deg)
+        translateY(-12px);
+    }
+    50% {
+      transform: perspective(1200px) rotateX(10deg) rotateY(-10deg)
+        translateY(-6px);
+    }
+    75% {
+      transform: perspective(1200px) rotateX(3deg) rotateY(-3deg)
+        translateY(-18px);
+    }
+  }
+
+  .animate-float {
+    animation: float 8s ease-in-out infinite;
+  }
 }
 
 @layer utilities {

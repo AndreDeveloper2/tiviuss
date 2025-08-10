@@ -36,7 +36,7 @@ const ScrollReveal: React.FC<ScrollRevealProps> = ({
   delay = 0,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const elementRef = useRef(null);
+  const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -78,27 +78,26 @@ const FloatingImage: React.FC<FloatingImageProps> = ({
   category,
   position = "left",
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseEnter = () => setIsHovered(true);
+  const handleMouseLeave = () => setIsHovered(false);
+
   return (
     <div
       className={`
         relative group cursor-pointer w-full max-w-lg mx-auto lg:mx-0
         ${position === "left" ? "lg:justify-self-start" : "lg:justify-self-end"}
+        transition-all duration-500 ease-out
+        ${isHovered ? "transform-gpu" : "animate-float"}
       `}
       style={{
-        transform: "perspective(1200px) rotateX(8deg) rotateY(-8deg)",
-        transition: "all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-        animation: "imageFloat 8s ease-in-out infinite",
+        transform: isHovered
+          ? "perspective(1200px) rotateX(0deg) rotateY(0deg) translateY(-20px) scale(1.05)"
+          : "perspective(1200px) rotateX(8deg) rotateY(-8deg)",
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform =
-          "perspective(1200px) rotateX(0deg) rotateY(0deg) translateY(-20px) scale(1.05)";
-        e.currentTarget.style.animation = "none";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform =
-          "perspective(1200px) rotateX(8deg) rotateY(-8deg) translateY(0px) scale(1)";
-        e.currentTarget.style.animation = "imageFloat 8s ease-in-out infinite";
-      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {/* Shadow */}
       <div className="absolute inset-0 bg-black/40 rounded-2xl lg:rounded-3xl blur-2xl transform translate-y-8 scale-95 opacity-60" />
@@ -133,28 +132,6 @@ const FloatingImage: React.FC<FloatingImageProps> = ({
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        @keyframes imageFloat {
-          0%,
-          100% {
-            transform: perspective(1200px) rotateX(8deg) rotateY(-8deg)
-              translateY(0px);
-          }
-          25% {
-            transform: perspective(1200px) rotateX(5deg) rotateY(-5deg)
-              translateY(-12px);
-          }
-          50% {
-            transform: perspective(1200px) rotateX(10deg) rotateY(-10deg)
-              translateY(-6px);
-          }
-          75% {
-            transform: perspective(1200px) rotateX(3deg) rotateY(-3deg)
-              translateY(-18px);
-          }
-        }
-      `}</style>
     </div>
   );
 };
@@ -211,7 +188,6 @@ const FloatingImageSection = () => {
       tvContent: {
         imageUrl:
           "https://www.bitmag.com.br/wp-content/uploads/2024/07/tv-paga.jpg",
-
         category: "Todos os canais!",
       },
       textContent: {

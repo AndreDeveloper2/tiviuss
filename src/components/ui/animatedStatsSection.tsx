@@ -1,18 +1,36 @@
 import React, { useState, useEffect, useRef } from "react";
 import ButtonCallAction from "../ButtonCallAction";
 
+interface UseCountAnimationProps {
+  end: number;
+  duration?: number;
+  shouldStart?: boolean;
+}
+
+interface StatCardProps {
+  number: number;
+  suffix: string;
+  label: string;
+  delay?: number;
+  shouldAnimate?: boolean;
+}
+
 // Hook para animação de números
-const useCountAnimation = (end, duration = 2000, shouldStart = false) => {
+const useCountAnimation = ({
+  end,
+  duration = 2000,
+  shouldStart = false,
+}: UseCountAnimationProps) => {
   const [count, setCount] = useState(0);
   const [hasAnimated, setHasAnimated] = useState(false);
 
   useEffect(() => {
     if (shouldStart && !hasAnimated) {
       setHasAnimated(true);
-      let startTime;
+      let startTime: number;
       const startCount = 0;
 
-      const animate = (currentTime) => {
+      const animate = (currentTime: number) => {
         if (!startTime) startTime = currentTime;
         const progress = Math.min((currentTime - startTime) / duration, 1);
 
@@ -37,8 +55,18 @@ const useCountAnimation = (end, duration = 2000, shouldStart = false) => {
 };
 
 // Componente de estatística individual
-const StatCard = ({ number, suffix, label, delay = 0, shouldAnimate }) => {
-  const animatedNumber = useCountAnimation(number, 2500, shouldAnimate);
+const StatCard: React.FC<StatCardProps> = ({
+  number,
+  suffix,
+  label,
+  delay = 0,
+  shouldAnimate,
+}) => {
+  const animatedNumber = useCountAnimation({
+    end: number,
+    duration: 2500,
+    shouldStart: shouldAnimate,
+  });
 
   return (
     <div

@@ -1,8 +1,40 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, ReactNode } from "react";
 import Image from "next/image";
 
+interface ScrollRevealProps {
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+}
+
+interface FloatingImageProps {
+  imageUrl: string;
+  title?: string;
+  category?: string;
+  position?: "left" | "right";
+}
+
+interface Section {
+  id: number;
+  position: "left" | "right";
+  tvContent: {
+    imageUrl: string;
+    title?: string;
+    category?: string;
+  };
+  textContent: {
+    title: string;
+    subtitle: string;
+    description: string;
+  };
+}
+
 // Simulação do ScrollReveal
-const ScrollReveal = ({ children, className = "", delay = 0 }) => {
+const ScrollReveal: React.FC<ScrollRevealProps> = ({
+  children,
+  className = "",
+  delay = 0,
+}) => {
   const [isVisible, setIsVisible] = useState(false);
   const elementRef = useRef(null);
 
@@ -40,7 +72,12 @@ const ScrollReveal = ({ children, className = "", delay = 0 }) => {
 };
 
 // Imagem flutuante limpa
-const FloatingImage = ({ imageUrl, title, category, position = "left" }) => {
+const FloatingImage: React.FC<FloatingImageProps> = ({
+  imageUrl,
+  title,
+  category,
+  position = "left",
+}) => {
   return (
     <div
       className={`
@@ -124,7 +161,7 @@ const FloatingImage = ({ imageUrl, title, category, position = "left" }) => {
 
 // Componente principal
 const FloatingImageSection = () => {
-  const sections = [
+  const sections: Section[] = [
     {
       id: 1,
       position: "left",

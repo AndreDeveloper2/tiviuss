@@ -1,7 +1,17 @@
 // GalaxyBackground.jsx
 "use client";
 
-export default function GalaxyBackground({ children, className = "" }) {
+import { ReactNode } from "react";
+
+interface GalaxyBackgroundProps {
+  children: ReactNode;
+  className?: string;
+}
+
+export default function GalaxyBackground({
+  children,
+  className = "",
+}: GalaxyBackgroundProps) {
   return (
     <div className={`relative overflow-hidden ${className}`}>
       {/* Fundo principal: preto -> cinza-900 -> branco */}

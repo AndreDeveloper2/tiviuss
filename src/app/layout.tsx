@@ -19,14 +19,6 @@ export const metadata: Metadata = {
     title: "Tivius - Streaming Premium 4K | Teste Grátis Agora!",
     description:
       "🎬 Streaming premium com qualidade 4K, catálogo gigantesco e zero burocracia! Funciona em qualquer dispositivo. Teste grátis e comprove!",
-    images: [
-      {
-        url: "/images/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Tivius Streaming - Qualidade 4K Premium",
-      },
-    ],
     siteName: "Tivius",
     locale: "pt_BR",
   },
@@ -35,7 +27,7 @@ export const metadata: Metadata = {
     title: "Tivius - Streaming Premium 4K | Teste Grátis!",
     description:
       "🚀 A revolução do streaming! Qualidade 4K, sem contrato, sem burocracia. Teste grátis agora!",
-    images: ["/images/twitter-image.png"],
+    images: ["/og-image.png"],
   },
   icons: {
     icon: "/favicon.png",

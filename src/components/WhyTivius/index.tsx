@@ -30,11 +30,11 @@ interface Section {
 }
 
 // Simulação do ScrollReveal
-const ScrollReveal: React.FC<ScrollRevealProps> = ({
+const ScrollReveal = ({
   children,
   className = "",
   delay = 0,
-}) => {
+}: ScrollRevealProps): React.JSX.Element => {
   const [isVisible, setIsVisible] = useState(false);
   const elementRef = useRef<HTMLDivElement>(null);
 

@@ -8,8 +8,47 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Tivius",
-  description: "A TV streaming de outro mundo",
+  title: "Tivius - Streaming Premium 4K | Sem Contrato, Sem Burocracia",
+  description:
+    "🚀 A revolução do streaming chegou! Qualidade 4K real, catálogo gigantesco, instalação em segundos. Teste GRÁTIS agora! Sem contrato, sem CPF, sem complicação.",
+  authors: [{ name: "Tivius" }],
+  keywords: ["streaming", "4K", "TV", "entretenimento", "sem contrato"],
+  openGraph: {
+    type: "website",
+    url: "https://seudominio.com.br",
+    title: "Tivius - Streaming Premium 4K | Teste Grátis Agora!",
+    description:
+      "🎬 Streaming premium com qualidade 4K, catálogo gigantesco e zero burocracia! Funciona em qualquer dispositivo. Teste grátis e comprove!",
+    images: [
+      {
+        url: "/images/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Tivius Streaming - Qualidade 4K Premium",
+      },
+    ],
+    siteName: "Tivius",
+    locale: "pt_BR",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Tivius - Streaming Premium 4K | Teste Grátis!",
+    description:
+      "🚀 A revolução do streaming! Qualidade 4K, sem contrato, sem burocracia. Teste grátis agora!",
+    images: ["/images/twitter-image.jpg"],
+  },
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
+  alternates: {
+    canonical: "https://seudominio.com.br",
+    languages: {
+      "pt-br": "https://seudominio.com.br",
+      "x-default": "https://seudominio.com.br",
+    },
+  },
 };
 
 export default function RootLayout({

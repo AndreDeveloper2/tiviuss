@@ -26,46 +26,55 @@ export async function POST(request: NextRequest) {
       const clienteNumero = content.Contact?.PhoneNumber;
       const clienteNome = content.Contact?.Name;
       const mensagem = content.LastMessage?.Content;
-      const timestamp = body.EventDate;
 
       console.log("👤 Cliente:", clienteNome);
       console.log("📱 Número:", clienteNumero);
       console.log("💬 Mensagem:", mensagem);
-      console.log("🕐 Data:", timestamp);
 
-      // Aqui você pode processar a mensagem
+      // Processar mensagem e gerar resposta
       if (mensagem) {
         const mensagemLower = mensagem.toLowerCase();
+        let resposta = "";
 
         if (
           mensagemLower.includes("fatura") ||
           mensagemLower.includes("boleto")
         ) {
           console.log("🧾 Cliente pediu fatura!");
-          // TODO: Gerar fatura
-        }
-
-        if (
+          resposta = `Olá ${clienteNome}! 🧾\n\nVou verificar sua fatura. Aguarde um momento...\n\n📋 Status: Consultando sistema...`;
+        } else if (
           mensagemLower.includes("débito") ||
           mensagemLower.includes("divida")
         ) {
           console.log("💰 Cliente perguntou sobre débito!");
-          // TODO: Consultar débitos
-        }
-
-        if (
+          resposta = `Olá ${clienteNome}! 💰\n\nConsultando seus débitos...\n\n⏳ Processando...`;
+        } else if (
           mensagemLower.includes("pagar") ||
           mensagemLower.includes("pagamento")
         ) {
           console.log("💳 Cliente quer pagar!");
-          // TODO: Enviar link de pagamento
+          resposta = `Olá ${clienteNome}! 💳\n\nGerando link de pagamento...\n\n🔗 Link será enviado em breve!`;
+        } else {
+          resposta = `Olá ${clienteNome}! 👋\n\nRecebemos: "${mensagem}"\n\n📋 Opções disponíveis:\n• "fatura" - Ver sua conta\n• "débito" - Consultar pendências\n• "pagar" - Quitar mensalidade`;
         }
+
+        console.log("📤 Preparando resposta:", resposta.substring(0, 50));
+
+        // Tentar retornar resposta que o Umbler possa processar
+        return NextResponse.json({
+          success: true,
+          message: "Mensagem processada!",
+          reply: {
+            to: clienteNumero,
+            message: resposta,
+          },
+        });
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: "Mensagem processada com sucesso!",
+      message: "Mensagem recebida!",
     });
   } catch (error) {
     console.error("❌ Erro:", error);

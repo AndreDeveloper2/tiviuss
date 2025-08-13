@@ -34,50 +34,72 @@ export async function POST(request: NextRequest) {
       // Processar mensagem e gerar resposta
       if (mensagem) {
         const mensagemLower = mensagem.toLowerCase();
-        let resposta = "";
 
         if (
           mensagemLower.includes("fatura") ||
           mensagemLower.includes("boleto")
         ) {
           console.log("🧾 Cliente pediu fatura!");
-          resposta = `Olá ${clienteNome}! 🧾\n\nVou verificar sua fatura. Aguarde um momento...\n\n📋 Status: Consultando sistema...`;
+
+          // TODO: Aqui você buscaria a fatura real do banco de dados
+          return NextResponse.json({
+            success: true,
+            tipo: "fatura",
+            mensagem: `🧾 *Sua Fatura - ${clienteNome}*\n\n📅 Vencimento: 15/01/2025\n💰 Valor: R$ 89,90\n📋 Status: Em aberto\n\n💳 Para pagar, digite *pagar*`,
+            valor: "R$ 89,90",
+            vencimento: "15/01/2025",
+            status: "Em aberto",
+          });
         } else if (
           mensagemLower.includes("débito") ||
           mensagemLower.includes("divida")
         ) {
           console.log("💰 Cliente perguntou sobre débito!");
-          resposta = `Olá ${clienteNome}! 💰\n\nConsultando seus débitos...\n\n⏳ Processando...`;
+
+          // TODO: Consultar débitos reais do banco
+          return NextResponse.json({
+            success: true,
+            tipo: "debito",
+            mensagem: `💰 *Situação Financeira - ${clienteNome}*\n\n✅ Você não possui débitos em aberto!\n📅 Próximo vencimento: 15/01/2025\n💰 Valor: R$ 89,90`,
+            temDebito: false,
+            proximoVencimento: "15/01/2025",
+          });
         } else if (
           mensagemLower.includes("pagar") ||
           mensagemLower.includes("pagamento")
         ) {
           console.log("💳 Cliente quer pagar!");
-          resposta = `Olá ${clienteNome}! 💳\n\nGerando link de pagamento...\n\n🔗 Link será enviado em breve!`;
+
+          // TODO: Gerar link real do Mercado Pago
+          return NextResponse.json({
+            success: true,
+            tipo: "pagamento",
+            mensagem: `💳 *Link de Pagamento - ${clienteNome}*\n\n💰 Valor: R$ 89,90\n📅 Vencimento: 15/01/2025\n\n🔗 Link para pagamento:\nhttps://mercadopago.com.br/checkout/exemplo123\n\n⚠️ Link válido por 24 horas`,
+            linkPagamento: "https://mercadopago.com.br/checkout/exemplo123",
+            valor: "R$ 89,90",
+          });
         } else {
-          resposta = `Olá ${clienteNome}! 👋\n\nRecebemos: "${mensagem}"\n\n📋 Opções disponíveis:\n• "fatura" - Ver sua conta\n• "débito" - Consultar pendências\n• "pagar" - Quitar mensalidade`;
+          // Resposta padrão
+          return NextResponse.json({
+            success: true,
+            tipo: "menu",
+            mensagem: `👋 Olá ${clienteNome}!\n\nPara te ajudar, digite:\n\n🧾 *fatura* - Ver sua conta\n💰 *débito* - Consultar pendências\n💳 *pagar* - Quitar mensalidade\n\n❓ Como posso ajudar?`,
+          });
         }
-
-        console.log("📤 Preparando resposta:", resposta.substring(0, 50));
-
-        // Tentar retornar resposta que o Umbler possa processar
-        return NextResponse.json({
-          success: true,
-          message: "Mensagem processada!",
-          reply: {
-            to: clienteNumero,
-            message: resposta,
-          },
-        });
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: "Mensagem recebida!",
+      tipo: "erro",
+      mensagem: "Não consegui processar sua mensagem. Tente novamente.",
     });
   } catch (error) {
     console.error("❌ Erro:", error);
-    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+    return NextResponse.json({
+      success: false,
+      tipo: "erro",
+      mensagem: "Ops! Ocorreu um erro. Tente novamente em alguns instantes.",
+    });
   }
 }

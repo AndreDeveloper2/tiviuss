@@ -16,25 +16,47 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log("Webhook Z-API recebido:", body);
 
-    // Extrair informações da mensagem
+    // Extrair informações da mensagem de múltiplas fontes (compatível com Z-API)
+    const rawMessage: string =
+      (typeof body?.message === "string" ? body.message : "") ||
+      (body?.text?.message ?? "") ||
+      (body?.listResponseMessage?.title ?? "") ||
+      (body?.buttonResponseMessage?.title ?? "");
+
+    const normalizedText = (rawMessage || "").toLowerCase();
+
+    // Extrair número do telefone do payload do Z-API ou do formato legado
+    const phoneFromPayload: string | undefined =
+      body?.phone || body?.customer?.phone;
+
+    // Se a mensagem contiver "pix" de qualquer uma das origens acima, gerar PIX
+    if (normalizedText.includes("pix")) {
+      const pixData = generateFakePix();
+      await sendPixViaZApi(phoneFromPayload || "5511999999999", pixData);
+
+      return NextResponse.json({
+        success: true,
+        message: "PIX gerado e enviado com sucesso",
+        pixData,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Compatibilidade com o formato legado usado nos testes locais
     const { message, customer, type } = body;
-
-    // Verificar se é uma mensagem de texto
-    if (type === "text" && message) {
-      const messageText = message.toLowerCase();
-
-      // Se a mensagem contém "pix", gerar PIX fictício
-      if (messageText.includes("pix")) {
-        // Gerar dados fictícios do PIX
+    if (type === "text" && typeof message === "string") {
+      const msg = message.toLowerCase();
+      if (msg.includes("pix")) {
         const pixData = generateFakePix();
-
-        // Enviar PIX via Z-API para o cliente
-        await sendPixViaZApi(customer?.phone, pixData);
+        await sendPixViaZApi(
+          customer?.phone || phoneFromPayload || "5511999999999",
+          pixData
+        );
 
         return NextResponse.json({
           success: true,
           message: "PIX gerado e enviado com sucesso",
-          pixData: pixData,
+          pixData,
           timestamp: new Date().toISOString(),
         });
       }
@@ -42,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Webhook Z-API recebido com sucesso",
+      message: "Webhook Z-API recebido com sucesso (sem ação)",
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -103,7 +125,6 @@ async function sendPixViaZApi(phone: string, pixData: PixData) {
     if (phone) {
       // Remove todos os caracteres não numéricos
       formattedPhone = phone.replace(/\D/g, "");
-
       // Se não começar com 55, adiciona
       if (!formattedPhone.startsWith("55")) {
         formattedPhone = `55${formattedPhone}`;
@@ -153,7 +174,7 @@ Dúvidas? Digite "atendente" para falar conosco.`;
       // Client-Token é obrigatório conforme erro da API
       "Client-Token":
         process.env.ZAPI_CLIENT_TOKEN || "5EB75083B0368AAAC6083A84",
-    };
+    } as Record<string, string>;
 
     const response = await fetch(zapiUrl, {
       method: "POST",
@@ -170,7 +191,6 @@ Dúvidas? Digite "atendente" para falar conosco.`;
     if (response.ok) {
       const responseData = await response.json();
       console.log("✅ PIX enviado via Z-API com sucesso:", responseData);
-
       // Verificar se a resposta contém os campos esperados
       if (responseData.zaapId || responseData.messageId || responseData.id) {
         console.log("✅ Resposta válida do Z-API:", {
@@ -189,7 +209,6 @@ Dúvidas? Digite "atendente" para falar conosco.`;
         response.statusText
       );
       console.error("❌ Resposta de erro:", errorText);
-
       // Tratamento específico de erros baseado na documentação
       if (response.status === 405) {
         console.error(

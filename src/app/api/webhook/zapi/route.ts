@@ -150,8 +150,9 @@ Dúvidas? Digite "atendente" para falar conosco.`;
     // Headers baseados na documentação oficial
     const headers = {
       "Content-Type": "application/json",
-      // Adicione o Client-Token se você tiver configurado
-      // "Client-Token": "seu_client_token_aqui"
+      // Client-Token é obrigatório conforme erro da API
+      "Client-Token":
+        process.env.ZAPI_CLIENT_TOKEN || "5EB75083B0368AAAC6083A84",
     };
 
     const response = await fetch(zapiUrl, {

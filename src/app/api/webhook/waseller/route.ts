@@ -19,9 +19,7 @@ export async function POST(request: NextRequest) {
         try {
           // Chamar o webhook do Z-API
           const zapiResponse = await fetch(
-            `${
-              process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
-            }/api/webhook/zapi`,
+            `https://tiviuss.vercel.app/api/webhook/zapi`,
             {
               method: "POST",
               headers: {

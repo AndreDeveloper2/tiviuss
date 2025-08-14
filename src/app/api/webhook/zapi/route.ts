@@ -98,12 +98,18 @@ async function sendPixViaZApi(phone: string, pixData: PixData) {
     const zapiUrl =
       "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-text";
 
-    // Formatar número de telefone corretamente
+    // Formatar número de telefone corretamente (apenas números, sem formatação)
     let formattedPhone = phone;
-    if (phone && !phone.startsWith("55")) {
-      formattedPhone = `55${phone.replace(/\D/g, "")}`;
-    } else if (phone) {
+    if (phone) {
+      // Remove todos os caracteres não numéricos
       formattedPhone = phone.replace(/\D/g, "");
+
+      // Se não começar com 55, adiciona
+      if (!formattedPhone.startsWith("55")) {
+        formattedPhone = `55${formattedPhone}`;
+      }
+    } else {
+      formattedPhone = "5511999999999"; // Número padrão para teste
     }
 
     console.log("📱 Enviando PIX para:", formattedPhone);
@@ -141,11 +147,16 @@ Dúvidas? Digite "atendente" para falar conosco.`;
       JSON.stringify(requestBody, null, 2)
     );
 
+    // Headers baseados na documentação oficial
+    const headers = {
+      "Content-Type": "application/json",
+      // Adicione o Client-Token se você tiver configurado
+      // "Client-Token": "seu_client_token_aqui"
+    };
+
     const response = await fetch(zapiUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: headers,
       body: JSON.stringify(requestBody),
     });
 
@@ -158,6 +169,17 @@ Dúvidas? Digite "atendente" para falar conosco.`;
     if (response.ok) {
       const responseData = await response.json();
       console.log("✅ PIX enviado via Z-API com sucesso:", responseData);
+
+      // Verificar se a resposta contém os campos esperados
+      if (responseData.zaapId || responseData.messageId || responseData.id) {
+        console.log("✅ Resposta válida do Z-API:", {
+          zaapId: responseData.zaapId,
+          messageId: responseData.messageId,
+          id: responseData.id,
+        });
+      } else {
+        console.warn("⚠️ Resposta inesperada do Z-API:", responseData);
+      }
     } else {
       const errorText = await response.text();
       console.error(
@@ -166,6 +188,15 @@ Dúvidas? Digite "atendente" para falar conosco.`;
         response.statusText
       );
       console.error("❌ Resposta de erro:", errorText);
+
+      // Tratamento específico de erros baseado na documentação
+      if (response.status === 405) {
+        console.error(
+          "❌ Erro 405: Verifique se está usando o método POST corretamente"
+        );
+      } else if (response.status === 415) {
+        console.error("❌ Erro 415: Verifique se o Content-Type está correto");
+      }
     }
   } catch (error) {
     console.error("❌ Erro ao enviar PIX via Z-API:", error);

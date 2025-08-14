@@ -212,7 +212,7 @@ Dúvidas? Digite "atendente" para falar conosco.`;
       // Tratamento específico de erros baseado na documentação
       if (response.status === 405) {
         console.error(
-          "❌ Erro 405: Verifique se está usando o método POST corretamente"
+          "❌ Erro 405: Verifique se está usando o método POSTT corretamente"
         );
       } else if (response.status === 415) {
         console.error("❌ Erro 415: Verifique se o Content-Type está correto");

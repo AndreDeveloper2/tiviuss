@@ -173,7 +173,7 @@ Dúvidas? Digite "atendente" para falar conosco.`;
       "Content-Type": "application/json",
       // Client-Token é obrigatório conforme erro da API
       "Client-Token":
-        process.env.ZAPI_CLIENT_TOKEN || "5EB75083B0368AAAC6083A84",
+        process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
     } as Record<string, string>;
 
     const response = await fetch(zapiUrl, {

@@ -98,6 +98,17 @@ async function sendPixViaZApi(phone: string, pixData: PixData) {
     const zapiUrl =
       "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-text";
 
+    // Formatar número de telefone corretamente
+    let formattedPhone = phone;
+    if (phone && !phone.startsWith("55")) {
+      formattedPhone = `55${phone.replace(/\D/g, "")}`;
+    } else if (phone) {
+      formattedPhone = phone.replace(/\D/g, "");
+    }
+
+    console.log("📱 Enviando PIX para:", formattedPhone);
+    console.log("🔗 URL Z-API:", zapiUrl);
+
     const message = `🟢 **PIX GERADO COM SUCESSO!**
 
 💰 **Valor:** R$ ${pixData.amount}
@@ -120,23 +131,43 @@ ${pixData.pixCode}
 
 Dúvidas? Digite "atendente" para falar conosco.`;
 
+    const requestBody = {
+      phone: formattedPhone,
+      message: message,
+    };
+
+    console.log(
+      "📤 Dados enviados para Z-API:",
+      JSON.stringify(requestBody, null, 2)
+    );
+
     const response = await fetch(zapiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        phone: phone || "5511999999999", // Número padrão para teste
-        message: message,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
+    console.log("📥 Status da resposta Z-API:", response.status);
+    console.log(
+      "📥 Headers da resposta:",
+      Object.fromEntries(response.headers.entries())
+    );
+
     if (response.ok) {
-      console.log("PIX enviado via Z-API com sucesso");
+      const responseData = await response.json();
+      console.log("✅ PIX enviado via Z-API com sucesso:", responseData);
     } else {
-      console.error("Erro ao enviar PIX via Z-API:", response.statusText);
+      const errorText = await response.text();
+      console.error(
+        "❌ Erro ao enviar PIX via Z-API:",
+        response.status,
+        response.statusText
+      );
+      console.error("❌ Resposta de erro:", errorText);
     }
   } catch (error) {
-    console.error("Erro ao enviar PIX via Z-API:", error);
+    console.error("❌ Erro ao enviar PIX via Z-API:", error);
   }
 }

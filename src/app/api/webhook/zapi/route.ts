@@ -1,5 +1,5 @@
+import { createMercadoPagoPayment } from "@/lib/mercadopago";
 import { NextRequest, NextResponse } from "next/server";
-import { createMercadoPagoPayment } from "../mercadopago/route";
 
 interface ZapiWebhookBody {
   phone: string;

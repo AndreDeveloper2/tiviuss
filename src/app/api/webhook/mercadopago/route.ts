@@ -1,63 +1,120 @@
-// api/webhook/mercadopago/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
-interface MercadoPagoNotification {
-  id: string;
-  live_mode: boolean;
-  type: string;
-  date_created: string;
-  application_id: string;
-  user_id: string;
-  version: string;
-  api_version: string;
-  action: string;
-  data: {
-    id: string;
-  };
-}
-
-interface PaymentStatus {
+interface PixPaymentResponse {
   id: number;
   status: string;
-  status_detail: string;
   transaction_amount: number;
-  external_reference?: string;
+  description: string;
+  payment_method_id: string;
   payer: {
-    email?: string;
+    email: string;
   };
-  date_approved?: string;
+  point_of_interaction: {
+    transaction_data: {
+      qr_code_base64: string;
+      qr_code: string;
+      ticket_url: string;
+    };
+  };
   date_created: string;
+  date_of_expiration: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body: MercadoPagoNotification = await request.json();
-    console.log("🔔 Notificação do Mercado Pago recebida:", body);
+    const body = await request.json();
 
-    // Verificar se é uma notificação de payment
-    if (body.type === "payment") {
-      const paymentId = body.data.id;
-      console.log("💳 Processando notificação de pagamento ID:", paymentId);
+    // Extrair informações da mensagem de múltiplas fontes (compatível com Z-API)
+    const rawMessage: string =
+      (typeof body?.message === "string" ? body.message : "") ||
+      (body?.text?.message ?? "") ||
+      (body?.listResponseMessage?.title ?? "") ||
+      (body?.buttonResponseMessage?.title ?? "");
 
-      // Buscar detalhes do pagamento
-      const paymentDetails = await getPaymentDetails(paymentId);
+    const normalizedText = (rawMessage || "").toLowerCase();
 
-      if (paymentDetails) {
-        await handlePaymentStatusChange(paymentDetails);
+    // Extrair número do telefone do payload do Z-API ou do formato legado
+    const phoneFromPayload: string | undefined =
+      body?.phone || body?.customer?.phone;
+
+    // Se a mensagem contiver "pix" de qualquer uma das origens acima, gerar PIX
+    if (normalizedText.includes("pix")) {
+      try {
+        const pixPayment = await createMercadoPagoPix();
+        await sendPixViaZApi(phoneFromPayload || "5511999999999", pixPayment);
+
+        return NextResponse.json({
+          success: true,
+          message: "PIX gerado via Mercado Pago e enviado com sucesso",
+          pixData: {
+            id: pixPayment.id,
+            amount: pixPayment.transaction_amount,
+            status: pixPayment.status,
+            qr_code: pixPayment.point_of_interaction.transaction_data.qr_code,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error("Erro ao gerar PIX no Mercado Pago:", error);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Erro ao gerar PIX",
+            timestamp: new Date().toISOString(),
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Compatibilidade com o formato legado usado nos testes locais
+    const { message, customer, type } = body;
+    if (type === "text" && typeof message === "string") {
+      const msg = message.toLowerCase();
+      if (msg.includes("pix")) {
+        try {
+          const pixPayment = await createMercadoPagoPix();
+          await sendPixViaZApi(
+            customer?.phone || phoneFromPayload || "5511999999999",
+            pixPayment
+          );
+
+          return NextResponse.json({
+            success: true,
+            message: "PIX gerado via Mercado Pago e enviado com sucesso",
+            pixData: {
+              id: pixPayment.id,
+              amount: pixPayment.transaction_amount,
+              status: pixPayment.status,
+              qr_code: pixPayment.point_of_interaction.transaction_data.qr_code,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error("Erro ao gerar PIX no Mercado Pago:", error);
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Erro ao gerar PIX",
+              timestamp: new Date().toISOString(),
+            },
+            { status: 500 }
+          );
+        }
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: "Notificação processada com sucesso",
+      message: "Webhook Z-API recebido com sucesso (sem ação)",
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("❌ Erro ao processar notificação do Mercado Pago:", error);
+    console.error("Erro no webhook Z-API:", error);
     return NextResponse.json(
       {
         success: false,
-        error: "Erro ao processar notificação",
+        error: "Erro interno do servidor",
         timestamp: new Date().toISOString(),
       },
       { status: 500 }
@@ -65,386 +122,260 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
-  // Endpoint para validação do webhook pelo Mercado Pago
-  const searchParams = request.nextUrl.searchParams;
-  const challenge = searchParams.get("challenge");
-
-  if (challenge) {
-    return new NextResponse(challenge, {
-      status: 200,
-      headers: { "Content-Type": "text/plain" },
-    });
-  }
-
+export async function GET() {
   return NextResponse.json({
-    message: "Webhook Mercado Pago ativo",
+    message: "Webhook Z-API ativo",
     status: "online",
     timestamp: new Date().toISOString(),
   });
 }
 
-// Função para buscar detalhes do pagamento
-async function getPaymentDetails(
-  paymentId: string
-): Promise<PaymentStatus | null> {
-  try {
-    const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+// Função para criar PIX no Mercado Pago
+async function createMercadoPagoPix(): Promise<PixPaymentResponse> {
+  const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
 
-    if (!accessToken) {
-      console.error("❌ Token de acesso do Mercado Pago não configurado");
-      return null;
-    }
-
-    const response = await fetch(
-      `https://api.mercadopago.com/v1/payments/${paymentId}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      console.error(
-        "❌ Erro ao buscar detalhes do pagamento:",
-        response.status
-      );
-      return null;
-    }
-
-    const paymentDetails: PaymentStatus = await response.json();
-    console.log("✅ Detalhes do pagamento obtidos:", paymentDetails);
-
-    return paymentDetails;
-  } catch (error) {
-    console.error("❌ Erro ao buscar detalhes do pagamento:", error);
-    return null;
+  if (!accessToken) {
+    throw new Error("Token de acesso do Mercado Pago não configurado");
   }
-}
 
-// Função para lidar com mudanças de status de pagamento
-async function handlePaymentStatusChange(payment: PaymentStatus) {
-  try {
-    console.log(`📊 Status do pagamento ${payment.id}: ${payment.status}`);
+  const amount = 10.0; // Valor fixo para testes
+  const transactionId = `TIV${Date.now()}-${Math.random()
+    .toString(36)
+    .substr(2, 9)}`;
 
-    // Aqui você pode implementar sua lógica de negócio baseada no status
-    switch (payment.status) {
-      case "approved":
-        console.log("✅ Pagamento aprovado!");
-        await notifyPaymentApproved(payment);
-        break;
-
-      case "pending":
-        console.log("⏳ Pagamento pendente");
-        await notifyPaymentPending(payment);
-        break;
-
-      case "rejected":
-        console.log("❌ Pagamento rejeitado");
-        await notifyPaymentRejected(payment);
-        break;
-
-      case "cancelled":
-        console.log("🚫 Pagamento cancelado");
-        await notifyPaymentCancelled(payment);
-        break;
-
-      default:
-        console.log(`❓ Status desconhecido: ${payment.status}`);
-    }
-  } catch (error) {
-    console.error("❌ Erro ao processar mudança de status:", error);
-  }
-}
-
-// Função para notificar pagamento aprovado
-async function notifyPaymentApproved(payment: PaymentStatus) {
-  try {
-    // Aqui você deveria ter uma forma de associar o pagamento ao cliente
-    // Por exemplo, usando o external_reference para encontrar o número de telefone
-    const phone = await findPhoneByReference(payment.external_reference || "");
-
-    if (phone) {
-      await sendApprovalNotification(phone, payment);
-    }
-  } catch (error) {
-    console.error("❌ Erro ao notificar pagamento aprovado:", error);
-  }
-}
-
-// Função para notificar pagamento pendente
-async function notifyPaymentPending(payment: PaymentStatus) {
-  try {
-    const phone = await findPhoneByReference(payment.external_reference || "");
-
-    if (phone) {
-      await sendPendingNotification(phone, payment);
-    }
-  } catch (error) {
-    console.error("❌ Erro ao notificar pagamento pendente:", error);
-  }
-}
-
-// Função para notificar pagamento rejeitado
-async function notifyPaymentRejected(payment: PaymentStatus) {
-  try {
-    const phone = await findPhoneByReference(payment.external_reference || "");
-
-    if (phone) {
-      await sendRejectionNotification(phone, payment);
-    }
-  } catch (error) {
-    console.error("❌ Erro ao notificar pagamento rejeitado:", error);
-  }
-}
-
-// Função para notificar pagamento cancelado
-async function notifyPaymentCancelled(payment: PaymentStatus) {
-  try {
-    const phone = await findPhoneByReference(payment.external_reference || "");
-
-    if (phone) {
-      await sendCancellationNotification(phone, payment);
-    }
-  } catch (error) {
-    console.error("❌ Erro ao notificar pagamento cancelado:", error);
-  }
-}
-
-// Função auxiliar para encontrar telefone pela referência
-async function findPhoneByReference(reference: string): Promise<string | null> {
-  // IMPLEMENTAR: Aqui você deve implementar a lógica para associar
-  // a referência externa (external_reference) ao número de telefone do cliente
-  // Isso pode ser feito através de um banco de dados, cache, etc.
-
-  // Por enquanto, retornando null - você deve implementar sua própria lógica
-  console.log("🔍 Procurando telefone para referência:", reference);
-
-  // Exemplo de implementação com um Map em memória (NÃO recomendado para produção):
-  // const phoneMap = new Map([
-  //   ["TIV1234567890", "5511999999999"]
-  // ]);
-  // return phoneMap.get(reference) || null;
-
-  return null;
-}
-
-// Função para enviar notificação de aprovação via Z-API
-async function sendApprovalNotification(phone: string, payment: PaymentStatus) {
-  try {
-    const zapiUrl =
-      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-text";
-
-    const message = `🎉 **PAGAMENTO APROVADO!**
-
-✅ **Status:** Pagamento confirmado
-💰 **Valor:** R$ ${payment.transaction_amount.toFixed(2)}
-🆔 **ID:** ${payment.id}
-📅 **Aprovado em:** ${
-      payment.date_approved
-        ? new Date(payment.date_approved).toLocaleString("pt-BR")
-        : "Agora"
-    }
-
-🔥 **Seu pedido está sendo processado!**
-
-Obrigado por escolher a Tivius! 
-Em breve você receberá mais informações.
-
-💬 Dúvidas? Digite "atendente"`;
-
-    const requestBody = {
-      phone: phone,
-      message: message,
-    };
-
-    const headers = {
-      "Content-Type": "application/json",
-      "Client-Token":
-        process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
-    };
-
-    const response = await fetch(zapiUrl, {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify(requestBody),
-    });
-
-    if (response.ok) {
-      console.log("✅ Notificação de aprovação enviada");
-    } else {
-      console.error("❌ Erro ao enviar notificação de aprovação");
-    }
-  } catch (error) {
-    console.error("❌ Erro ao enviar notificação via Z-API:", error);
-  }
-}
-
-// Função para enviar notificação de pendência
-async function sendPendingNotification(phone: string, payment: PaymentStatus) {
-  try {
-    const zapiUrl =
-      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-text";
-
-    const message = `⏳ **PAGAMENTO PENDENTE**
-
-🔄 **Status:** Aguardando confirmação
-💰 **Valor:** R$ ${payment.transaction_amount.toFixed(2)}
-🆔 **ID:** ${payment.id}
-
-⚠️ **Ação necessária:**
-Seu PIX ainda não foi processado. 
-Verifique se você completou o pagamento no seu app bancário.
-
-💡 **O que fazer:**
-1. Abra seu app bancário
-2. Verifique se o PIX foi enviado
-3. Se não, complete o pagamento
-
-🔍 Digite "status" para verificar novamente
-💬 Digite "atendente" se precisar de ajuda`;
-
-    const requestBody = {
-      phone: phone,
-      message: message,
-    };
-
-    const headers = {
-      "Content-Type": "application/json",
-      "Client-Token":
-        process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
-    };
-
-    const response = await fetch(zapiUrl, {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify(requestBody),
-    });
-
-    if (response.ok) {
-      console.log("✅ Notificação de pendência enviada");
-    } else {
-      console.error("❌ Erro ao enviar notificação de pendência");
-    }
-  } catch (error) {
-    console.error("❌ Erro ao enviar notificação de pendência:", error);
-  }
-}
-
-// Função para enviar notificação de rejeição
-async function sendRejectionNotification(
-  phone: string,
-  payment: PaymentStatus
-) {
-  try {
-    const zapiUrl =
-      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-text";
-
-    const message = `❌ **PAGAMENTO NÃO APROVADO**
-
-🚫 **Status:** Rejeitado
-💰 **Valor:** R$ ${payment.transaction_amount.toFixed(2)}
-🆔 **ID:** ${payment.id}
-📝 **Motivo:** ${getStatusDetailMessage(payment.status_detail)}
-
-💡 **O que fazer:**
-1. Verifique seus dados bancários
-2. Certifique-se que há saldo suficiente
-3. Tente novamente em alguns minutos
-
-🔄 Digite "pix" para gerar um novo pagamento
-💬 Digite "atendente" para suporte`;
-
-    const requestBody = {
-      phone: phone,
-      message: message,
-    };
-
-    const headers = {
-      "Content-Type": "application/json",
-      "Client-Token":
-        process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
-    };
-
-    const response = await fetch(zapiUrl, {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify(requestBody),
-    });
-
-    if (response.ok) {
-      console.log("✅ Notificação de rejeição enviada");
-    } else {
-      console.error("❌ Erro ao enviar notificação de rejeição");
-    }
-  } catch (error) {
-    console.error("❌ Erro ao enviar notificação de rejeição:", error);
-  }
-}
-
-// Função para enviar notificação de cancelamento
-async function sendCancellationNotification(
-  phone: string,
-  payment: PaymentStatus
-) {
-  try {
-    const zapiUrl =
-      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-text";
-
-    const message = `🚫 **PAGAMENTO CANCELADO**
-
-❌ **Status:** Cancelado
-💰 **Valor:** R$ ${payment.transaction_amount.toFixed(2)}
-🆔 **ID:** ${payment.id}
-
-ℹ️ **Informação:**
-Seu pagamento foi cancelado. Nenhum valor foi debitado.
-
-🔄 Digite "pix" para gerar um novo pagamento
-💬 Digite "atendente" se tiver dúvidas`;
-
-    const requestBody = {
-      phone: phone,
-      message: message,
-    };
-
-    const headers = {
-      "Content-Type": "application/json",
-      "Client-Token":
-        process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
-    };
-
-    const response = await fetch(zapiUrl, {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify(requestBody),
-    });
-
-    if (response.ok) {
-      console.log("✅ Notificação de cancelamento enviada");
-    } else {
-      console.error("❌ Erro ao enviar notificação de cancelamento");
-    }
-  } catch (error) {
-    console.error("❌ Erro ao enviar notificação de cancelamento:", error);
-  }
-}
-
-// Função auxiliar para converter status_detail em mensagem amigável
-function getStatusDetailMessage(statusDetail: string): string {
-  const statusMessages: Record<string, string> = {
-    cc_rejected_insufficient_amount: "Saldo insuficiente",
-    cc_rejected_bad_filled_date: "Data de vencimento inválida",
-    cc_rejected_bad_filled_security_code: "Código de segurança inválido",
-    cc_rejected_bad_filled_other: "Dados do cartão inválidos",
-    rejected_by_regulations: "Rejeitado por regulamentações",
-    rejected_high_risk: "Transação de alto risco",
-    pix_rejected: "PIX rejeitado pelo banco",
-    expired: "Pagamento expirado",
+  const paymentData = {
+    transaction_amount: amount,
+    description: `Pagamento Tivius - ${new Date().toLocaleDateString("pt-BR")}`,
+    payment_method_id: "pix",
+    external_reference: transactionId,
+    notification_url: "https://tiviuss.vercel.app/api/webhook/mercadopago",
+    payer: {
+      email: "cliente@tivius.com",
+      first_name: "Cliente",
+      last_name: "Tivius",
+    },
+    date_of_expiration: new Date(
+      Date.now() + 24 * 60 * 60 * 1000
+    ).toISOString(), // Expira em 24h
   };
 
-  return statusMessages[statusDetail] || "Motivo não especificado";
+  console.log("📤 Criando PIX no Mercado Pago:", paymentData);
+  console.log("🔑 Idempotency Key:", transactionId);
+
+  const response = await fetch("https://api.mercadopago.com/v1/payments", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+      "X-Idempotency-Key": transactionId, // Evita duplicação de pagamentos
+    },
+    body: JSON.stringify(paymentData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error(
+      "❌ Erro na API do Mercado Pago:",
+      response.status,
+      errorData
+    );
+
+    // Se for erro 400 e contiver idempotency, pode ser pagamento duplicado
+    if (response.status === 400 && errorData.includes("idempotency")) {
+      console.warn("⚠️ Possível pagamento duplicado detectado");
+    }
+
+    throw new Error(`Erro na API do Mercado Pago: ${response.status}`);
+  }
+
+  const pixPayment: PixPaymentResponse = await response.json();
+  console.log("✅ PIX criado no Mercado Pago:", pixPayment);
+
+  return pixPayment;
+}
+
+// Função para enviar PIX via Z-API com botão de copiar
+async function sendPixViaZApi(phone: string, pixData: PixPaymentResponse) {
+  try {
+    const zapiUrl =
+      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-actions";
+
+    // Formatar número de telefone corretamente
+    let formattedPhone = phone;
+    if (phone) {
+      formattedPhone = phone.replace(/\D/g, "");
+      if (!formattedPhone.startsWith("55")) {
+        formattedPhone = `55${formattedPhone}`;
+      }
+    } else {
+      formattedPhone = "5511999999999";
+    }
+
+    console.log("📱 Enviando PIX para:", formattedPhone);
+
+    const message = `🟢 **PIX GERADO COM SUCESSO!**
+
+💰 **Valor:** R$ ${pixData.transaction_amount.toFixed(2)}
+📝 **Descrição:** ${pixData.description}
+🆔 **ID do Pagamento:** ${pixData.id}
+⏰ **Expira em:** ${new Date(pixData.date_of_expiration).toLocaleString(
+      "pt-BR"
+    )}
+
+💡 **Como pagar:**
+1. Clique em "📋 Copiar PIX" abaixo
+2. Abra seu app bancário
+3. Escolha "PIX" → "Copia e Cola"
+4. Cole o código e confirme
+
+✅ Após o pagamento, você receberá confirmação automática.`;
+
+    // Criar URL para copiar PIX (conforme documentação Z-API)
+    const pixCode = pixData.point_of_interaction.transaction_data.qr_code;
+    const copyUrl = `https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=${encodeURIComponent(
+      pixCode
+    )}`;
+
+    // Dados para enviar mensagem com botões de ação
+    const requestBody = {
+      phone: formattedPhone,
+      message: message,
+      buttonActions: [
+        {
+          type: "URL",
+          phone: formattedPhone, // Obrigatório
+          url: copyUrl,
+          label: "📋 Copiar PIX",
+        },
+        {
+          type: "REPLY",
+          phone: formattedPhone, // Obrigatório
+          url: "", // Obrigatório (pode ser vazio para REPLY)
+          label: "🔍 Status",
+        },
+        {
+          type: "REPLY",
+          phone: formattedPhone, // Obrigatório
+          url: "", // Obrigatório (pode ser vazio para REPLY)
+          label: "❓ Ajuda",
+        },
+      ],
+    };
+
+    console.log("📤 Enviando mensagem com botões de ação para Z-API");
+    console.log("🔗 URL de cópia:", copyUrl);
+
+    const headers = {
+      "Content-Type": "application/json",
+      "Client-Token":
+        process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
+    };
+
+    const response = await fetch(zapiUrl, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log("📥 Status da resposta Z-API:", response.status);
+    console.log(
+      "📥 Headers da resposta Z-API:",
+      Object.fromEntries(response.headers.entries())
+    );
+
+    if (response.ok) {
+      const responseData = await response.json();
+      console.log(
+        "✅ Mensagem com botões de ação enviada via Z-API:",
+        responseData
+      );
+
+      // Sempre enviar fallback também para garantir que chegue a mensagem
+      console.log(
+        "🔄 Enviando mensagem fallback adicional para garantir entrega"
+      );
+      await sendPixCodeMessage(formattedPhone, pixCode);
+    } else {
+      const errorText = await response.text();
+      console.error("❌ Erro ao enviar via Z-API:", response.status, errorText);
+      console.error(
+        "❌ Request enviado:",
+        JSON.stringify(requestBody, null, 2)
+      );
+      // Fallback: enviar mensagem simples com código
+      await sendPixCodeMessage(formattedPhone, pixCode);
+    }
+  } catch (error) {
+    console.error("❌ Erro ao enviar PIX via Z-API:", error);
+    // Fallback: enviar mensagem simples
+    await sendPixCodeMessage(
+      phone,
+      pixData.point_of_interaction.transaction_data.qr_code
+    );
+  }
+}
+
+// Função para enviar o código PIX separadamente (fallback)
+async function sendPixCodeMessage(phone: string, pixCode: string) {
+  try {
+    console.log("🔄 Enviando mensagem fallback (texto simples)");
+
+    const zapiUrl =
+      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-text";
+
+    const message = `🟢 **PIX GERADO COM SUCESSO!**
+
+💰 **Valor:** R$ 10.00
+📝 **Pagamento Tivius**
+
+📋 **CÓDIGO PIX (COPIE ABAIXO):**
+
+\`\`\`${pixCode}\`\`\`
+
+💡 **Como pagar:**
+1. Copie o código acima
+2. Abra seu app bancário  
+3. Escolha PIX → Copia e Cola
+4. Cole e confirme
+
+✅ Você receberá confirmação quando o pagamento for aprovado!
+
+🔍 Digite "status" para verificar
+❓ Digite "ajuda" para suporte`;
+
+    const requestBody = {
+      phone: phone,
+      message: message,
+    };
+
+    console.log("📤 Enviando fallback para:", phone);
+
+    const headers = {
+      "Content-Type": "application/json",
+      "Client-Token":
+        process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
+    };
+
+    const response = await fetch(zapiUrl, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log("📥 Status fallback Z-API:", response.status);
+
+    if (response.ok) {
+      const responseData = await response.json();
+      console.log("✅ Mensagem fallback enviada:", responseData);
+    } else {
+      const errorText = await response.text();
+      console.error("❌ Erro no fallback Z-API:", response.status, errorText);
+      console.error(
+        "❌ Request fallback:",
+        JSON.stringify(requestBody, null, 2)
+      );
+    }
+  } catch (error) {
+    console.error("❌ Erro ao enviar mensagem fallback:", error);
+  }
 }

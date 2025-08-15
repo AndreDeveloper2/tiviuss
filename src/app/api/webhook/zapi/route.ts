@@ -139,7 +139,7 @@ async function createMercadoPagoPix(): Promise<PixPaymentResponse> {
     throw new Error("Token de acesso do Mercado Pago não configurado");
   }
 
-  const amount = Math.floor(Math.random() * 1000) + 50; // Valor entre R$ 50 e R$ 1050
+  const amount = 10.0; // Valor fixo para testes
   const transactionId = `TIV${Date.now()}`;
 
   const paymentData = {
@@ -190,7 +190,7 @@ async function createMercadoPagoPix(): Promise<PixPaymentResponse> {
 async function sendPixViaZApi(phone: string, pixData: PixPaymentResponse) {
   try {
     const zapiUrl =
-      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-list";
+      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-actions";
 
     // Formatar número de telefone corretamente
     let formattedPhone = phone;
@@ -222,29 +222,37 @@ async function sendPixViaZApi(phone: string, pixData: PixPaymentResponse) {
 
 ✅ Após o pagamento, você receberá confirmação automática.`;
 
-    // Dados para enviar mensagem com botões
+    // Criar URL para copiar PIX (conforme documentação Z-API)
+    const pixCode = pixData.point_of_interaction.transaction_data.qr_code;
+    const copyUrl = `https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=${encodeURIComponent(
+      pixCode
+    )}`;
+
+    // Dados para enviar mensagem com botões de ação
     const requestBody = {
       phone: formattedPhone,
       message: message,
-      buttonList: {
-        buttons: [
-          {
-            id: "copy_pix",
-            title: "📋 Copiar PIX",
-          },
-          {
-            id: "check_status",
-            title: "🔍 Verificar Status",
-          },
-          {
-            id: "help",
-            title: "❓ Ajuda",
-          },
-        ],
-      },
+      buttonActions: [
+        {
+          type: "URL",
+          url: copyUrl,
+          label: "📋 Copiar PIX",
+        },
+        {
+          type: "REPLY",
+          phone: formattedPhone,
+          label: "🔍 Status",
+        },
+        {
+          type: "REPLY",
+          phone: formattedPhone,
+          label: "❓ Ajuda",
+        },
+      ],
     };
 
-    console.log("📤 Enviando mensagem com botões para Z-API");
+    console.log("📤 Enviando mensagem com botões de ação para Z-API");
+    console.log("🔗 URL de cópia:", copyUrl);
 
     const headers = {
       "Content-Type": "application/json",
@@ -262,19 +270,23 @@ async function sendPixViaZApi(phone: string, pixData: PixPaymentResponse) {
 
     if (response.ok) {
       const responseData = await response.json();
-      console.log("✅ Mensagem com botões enviada via Z-API:", responseData);
-
-      // Enviar o código PIX separadamente para facilitar a cópia
-      await sendPixCodeMessage(
-        formattedPhone,
-        pixData.point_of_interaction.transaction_data.qr_code
+      console.log(
+        "✅ Mensagem com botões de ação enviada via Z-API:",
+        responseData
       );
     } else {
       const errorText = await response.text();
       console.error("❌ Erro ao enviar via Z-API:", response.status, errorText);
+      // Fallback: enviar mensagem simples com código
+      await sendPixCodeMessage(formattedPhone, pixCode);
     }
   } catch (error) {
     console.error("❌ Erro ao enviar PIX via Z-API:", error);
+    // Fallback: enviar mensagem simples
+    await sendPixCodeMessage(
+      phone,
+      pixData.point_of_interaction.transaction_data.qr_code
+    );
   }
 }
 

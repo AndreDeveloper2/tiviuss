@@ -147,9 +147,7 @@ async function createMercadoPagoPix(): Promise<PixPaymentResponse> {
     description: `Pagamento Tivius - ${new Date().toLocaleDateString("pt-BR")}`,
     payment_method_id: "pix",
     external_reference: transactionId,
-    notification_url: `${
-      process.env.VERCEL_URL || "https://seu-dominio.vercel.app"
-    }/api/webhook/mercadopago`,
+    notification_url: "https://tiviuss.vercel.app/api/webhook/mercadopago",
     payer: {
       email: "cliente@tivius.com",
       first_name: "Cliente",

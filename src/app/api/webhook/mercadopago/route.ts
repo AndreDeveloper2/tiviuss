@@ -210,10 +210,7 @@ async function sendPixViaZApi(phone: string, pixData: PixPaymentResponse) {
 
     console.log("📱 Enviando PIX para:", formattedPhone);
 
-    // Primeira mensagem: Informações do PIX
-    await sendPixInfoMessage(formattedPhone, pixData);
-
-    // Segunda mensagem: Código PIX com botão de copiar
+    // MUDANÇA: Primeiro tentar o botão PIX específico da Z-API
     await sendPixCodeWithButton(
       formattedPhone,
       pixData.point_of_interaction.transaction_data.qr_code
@@ -229,6 +226,7 @@ async function sendPixViaZApi(phone: string, pixData: PixPaymentResponse) {
 }
 
 // Função para enviar informações do PIX
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function sendPixInfoMessage(phone: string, pixData: PixPaymentResponse) {
   try {
     const zapiUrl =
@@ -288,6 +286,8 @@ async function sendPixInfoMessage(phone: string, pixData: PixPaymentResponse) {
 // Função para enviar PIX usando o botão PIX específico da Z-API
 async function sendPixCodeWithButton(phone: string, pixCode: string) {
   try {
+    console.log("📤 Tentando BOTÃO PIX ESPECÍFICO da Z-API");
+
     // SOLUÇÃO: Usar o endpoint específico para PIX button que é mais estável
     const zapiUrl =
       "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-pix";
@@ -300,9 +300,7 @@ async function sendPixCodeWithButton(phone: string, pixCode: string) {
       merchantName: "💰 Copiar PIX - Tivius", // Nome do comerciante exibido
     };
 
-    console.log("📤 Enviando PIX com botão específico Z-API");
-    console.log("📋 Código PIX:", pixCode.substring(0, 50) + "...");
-    console.log("📋 Payload:", JSON.stringify(requestBody, null, 2));
+    console.log("📋 Payload PIX BUTTON:", JSON.stringify(requestBody, null, 2));
 
     const headers = {
       "Content-Type": "application/json",
@@ -316,31 +314,28 @@ async function sendPixCodeWithButton(phone: string, pixCode: string) {
       body: JSON.stringify(requestBody),
     });
 
-    console.log("📥 Status da resposta Z-API (PIX button):", response.status);
+    console.log("📥 Status PIX BUTTON:", response.status);
 
     if (response.ok) {
       const responseData = await response.json();
-      console.log("✅ PIX button enviado com sucesso:", responseData);
+      console.log("✅ PIX BUTTON enviado:", responseData);
     } else {
       const errorText = await response.text();
-      console.error(
-        "❌ Erro ao enviar PIX button:",
-        response.status,
-        errorText
-      );
-      console.error("❌ Tentando alternativa com botão OTP...");
+      console.error("❌ Erro PIX BUTTON:", response.status, errorText);
+      console.log("🔄 Tentando BOTÃO SIMPLES...");
 
-      // Alternativa 1: Tentar com botão OTP (que também funciona bem)
-      await sendPixWithOTPButton(phone, pixCode);
+      // Alternativa: Tentar com botões simples (mais estáveis)
+      await sendPixWithSimpleButtons(phone, pixCode);
     }
   } catch (error) {
-    console.error("❌ Erro ao enviar PIX button:", error);
-    // Alternativa: tentar com botão OTP
-    await sendPixWithOTPButton(phone, pixCode);
+    console.error("❌ Erro PIX BUTTON:", error);
+    // Alternativa: tentar com botões simples
+    await sendPixWithSimpleButtons(phone, pixCode);
   }
 }
 
 // Função alternativa usando botão OTP (mais estável)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function sendPixWithOTPButton(phone: string, pixCode: string) {
   try {
     console.log("🔄 Tentando com botão OTP (alternativa)");
@@ -396,7 +391,7 @@ Use o botão abaixo para copiar o código PIX:`;
 // Função alternativa com botões simples (mais estável segundo documentação)
 async function sendPixWithSimpleButtons(phone: string, pixCode: string) {
   try {
-    console.log("🔄 Tentando botões simples (mais estável)");
+    console.log("📤 Tentando BOTÕES SIMPLES (mais estável)");
 
     const zapiUrl =
       "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-list";
@@ -406,12 +401,12 @@ async function sendPixWithSimpleButtons(phone: string, pixCode: string) {
 💰 **Valor:** R$ 10.00
 📝 **Pagamento Tivius**
 
-📋 **Escolha uma opção:**`;
+✅ PIX pronto para pagamento!`;
 
     const requestBody = {
       phone: phone,
       message: message,
-      footer: "💡 Código PIX disponível",
+      footer: "💡 Escolha uma opção abaixo",
       buttons: [
         {
           id: "copy_pix",
@@ -424,7 +419,10 @@ async function sendPixWithSimpleButtons(phone: string, pixCode: string) {
       ],
     };
 
-    console.log("📤 Enviando botões simples");
+    console.log(
+      "📋 Payload BOTÕES SIMPLES:",
+      JSON.stringify(requestBody, null, 2)
+    );
 
     const headers = {
       "Content-Type": "application/json",
@@ -438,22 +436,23 @@ async function sendPixWithSimpleButtons(phone: string, pixCode: string) {
       body: JSON.stringify(requestBody),
     });
 
-    console.log("📥 Status botões simples:", response.status);
+    console.log("📥 Status BOTÕES SIMPLES:", response.status);
 
     if (response.ok) {
       const responseData = await response.json();
-      console.log("✅ Botões simples enviados:", responseData);
+      console.log("✅ BOTÕES SIMPLES enviados:", responseData);
 
-      // Enviar o código PIX logo em seguida
+      // Enviar o código PIX logo em seguida (2 segundos depois)
+      console.log("⏰ Enviando código PIX em 2 segundos...");
       setTimeout(() => {
         sendPixCodeMessage(phone, pixCode);
       }, 2000);
     } else {
       const errorText = await response.text();
-      console.error("❌ Erro botões simples:", response.status, errorText);
+      console.error("❌ Erro BOTÕES SIMPLES:", response.status, errorText);
 
-      // Último fallback: mensagem simples
-      console.log("🔄 Usando fallback final...");
+      // Último fallback: mensagem simples IMEDIATAMENTE
+      console.log("🔄 Fallback FINAL - Mensagem simples...");
       await sendPixCodeMessage(phone, pixCode);
     }
   } catch (error) {
@@ -463,10 +462,10 @@ async function sendPixWithSimpleButtons(phone: string, pixCode: string) {
   }
 }
 
-// Função para enviar o código PIX separadamente (fallback)
+// Função para enviar o código PIX separadamente (fallback GARANTIDO)
 async function sendPixCodeMessage(phone: string, pixCode: string) {
   try {
-    console.log("🔄 Enviando mensagem fallback (texto simples)");
+    console.log("📤 === FALLBACK FINAL - MENSAGEM DE TEXTO ===");
 
     const zapiUrl =
       "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-text";
@@ -475,16 +474,17 @@ async function sendPixCodeMessage(phone: string, pixCode: string) {
 
 💰 **Valor:** R$ 10.00
 📝 **Pagamento Tivius**
+🆔 **ID:** ${Date.now()}
 
 📋 **CÓDIGO PIX (COPIE ABAIXO):**
 
-\`\`\`${pixCode}\`\`\`
+${pixCode}
 
-💡 **Como pagar:**
-1. Copie o código acima
-2. Abra seu app bancário  
-3. Escolha PIX → Copia e Cola
-4. Cole e confirme
+💡 **INSTRUÇÕES:**
+1️⃣ Copie o código acima (todo o código)
+2️⃣ Abra seu app bancário  
+3️⃣ Escolha PIX → Copia e Cola
+4️⃣ Cole o código e confirme
 
 ✅ Você receberá confirmação quando o pagamento for aprovado!
 
@@ -496,7 +496,8 @@ async function sendPixCodeMessage(phone: string, pixCode: string) {
       message: message,
     };
 
-    console.log("📤 Enviando fallback para:", phone);
+    console.log("📤 Enviando MENSAGEM FINAL para:", phone);
+    console.log("📋 Tamanho da mensagem:", message.length, "caracteres");
 
     const headers = {
       "Content-Type": "application/json",
@@ -510,20 +511,22 @@ async function sendPixCodeMessage(phone: string, pixCode: string) {
       body: JSON.stringify(requestBody),
     });
 
-    console.log("📥 Status fallback Z-API:", response.status);
+    console.log("📥 Status MENSAGEM FINAL:", response.status);
 
     if (response.ok) {
       const responseData = await response.json();
-      console.log("✅ Mensagem fallback enviada:", responseData);
+      console.log("✅ === MENSAGEM FINAL ENVIADA COM SUCESSO ===");
+      console.log("📨 Response:", responseData);
     } else {
       const errorText = await response.text();
-      console.error("❌ Erro no fallback Z-API:", response.status, errorText);
-      console.error(
-        "❌ Request fallback:",
-        JSON.stringify(requestBody, null, 2)
-      );
+      console.error("❌ === ERRO NA MENSAGEM FINAL ===");
+      console.error("❌ Status:", response.status);
+      console.error("❌ Erro:", errorText);
+      console.error("❌ Headers:", JSON.stringify(headers, null, 2));
+      console.error("❌ Body:", JSON.stringify(requestBody, null, 2));
     }
   } catch (error) {
-    console.error("❌ Erro ao enviar mensagem fallback:", error);
+    console.error("❌ === ERRO CRÍTICO NA MENSAGEM FINAL ===");
+    console.error("❌ Error:", error);
   }
 }

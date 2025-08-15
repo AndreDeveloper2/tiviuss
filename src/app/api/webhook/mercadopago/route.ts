@@ -285,41 +285,24 @@ async function sendPixInfoMessage(phone: string, pixData: PixPaymentResponse) {
   }
 }
 
-// Função CORRIGIDA para enviar código PIX com botão de copiar
+// Função para enviar PIX usando o botão PIX específico da Z-API
 async function sendPixCodeWithButton(phone: string, pixCode: string) {
   try {
+    // SOLUÇÃO: Usar o endpoint específico para PIX button que é mais estável
     const zapiUrl =
-      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-actions";
+      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-pix";
 
-    const message = `📋 **CÓDIGO PIX COPIA E COLA**
-
-Clique no botão abaixo para copiar automaticamente:`;
-
-    // CORREÇÃO: Usar a URL correta do WhatsApp para copiar código
-    const copyUrl = `https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=${encodeURIComponent(
-      pixCode
-    )}`;
-
-    // CORREÇÃO: Estrutura correta do payload conforme documentação Z-API
+    // Estrutura CORRETA conforme documentação Z-API para PIX button
     const requestBody = {
       phone: phone,
-      message: message,
-      buttonActions: [
-        {
-          type: "URL", // Tipo correto
-          url: copyUrl, // URL para copiar
-          label: "📋 Copiar PIX", // Texto do botão
-          // Removido o campo 'phone' que não é necessário para tipo URL
-        },
-      ],
-      // ADICIONADO: Campos opcionais que podem ajudar
-      title: "PIX Copia e Cola", // Título opcional
-      footer: "Toque no botão para copiar", // Rodapé opcional
+      pixKey: pixCode, // Usar o código PIX como chave
+      type: "EVP", // Chave aleatória (EVP) - mais apropriado para códigos PIX
+      merchantName: "💰 Copiar PIX - Tivius", // Nome do comerciante exibido
     };
 
-    console.log("📤 Enviando código PIX com botão de copiar");
-    console.log("🔗 URL de cópia:", copyUrl);
-    console.log("📋 Payload completo:", JSON.stringify(requestBody, null, 2));
+    console.log("📤 Enviando PIX com botão específico Z-API");
+    console.log("📋 Código PIX:", pixCode.substring(0, 50) + "...");
+    console.log("📋 Payload:", JSON.stringify(requestBody, null, 2));
 
     const headers = {
       "Content-Type": "application/json",
@@ -333,24 +316,149 @@ Clique no botão abaixo para copiar automaticamente:`;
       body: JSON.stringify(requestBody),
     });
 
-    console.log("📥 Status da resposta Z-API (botão):", response.status);
+    console.log("📥 Status da resposta Z-API (PIX button):", response.status);
 
     if (response.ok) {
       const responseData = await response.json();
-      console.log("✅ Código PIX com botão enviado:", responseData);
+      console.log("✅ PIX button enviado com sucesso:", responseData);
     } else {
       const errorText = await response.text();
-      console.error("❌ Erro ao enviar botão:", response.status, errorText);
-      console.error("❌ Headers enviados:", headers);
-      console.error("❌ Body enviado:", JSON.stringify(requestBody, null, 2));
+      console.error(
+        "❌ Erro ao enviar PIX button:",
+        response.status,
+        errorText
+      );
+      console.error("❌ Tentando alternativa com botão OTP...");
 
-      // Fallback: enviar código como texto simples
-      console.log("🔄 Tentando fallback...");
+      // Alternativa 1: Tentar com botão OTP (que também funciona bem)
+      await sendPixWithOTPButton(phone, pixCode);
+    }
+  } catch (error) {
+    console.error("❌ Erro ao enviar PIX button:", error);
+    // Alternativa: tentar com botão OTP
+    await sendPixWithOTPButton(phone, pixCode);
+  }
+}
+
+// Função alternativa usando botão OTP (mais estável)
+async function sendPixWithOTPButton(phone: string, pixCode: string) {
+  try {
+    console.log("🔄 Tentando com botão OTP (alternativa)");
+
+    const zapiUrl =
+      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-otp";
+
+    const message = `📋 **CÓDIGO PIX COPIA E COLA**
+
+Use o botão abaixo para copiar o código PIX:`;
+
+    const requestBody = {
+      phone: phone,
+      message: message,
+      footer: "💡 Após copiar, cole no seu app bancário",
+      copyCodeText: pixCode, // O código para copiar
+      copyCodeButtonText: "📋 Copiar PIX", // Texto do botão
+    };
+
+    console.log("📤 Enviando com botão OTP");
+
+    const headers = {
+      "Content-Type": "application/json",
+      "Client-Token":
+        process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
+    };
+
+    const response = await fetch(zapiUrl, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log("📥 Status OTP button:", response.status);
+
+    if (response.ok) {
+      const responseData = await response.json();
+      console.log("✅ OTP button enviado:", responseData);
+    } else {
+      const errorText = await response.text();
+      console.error("❌ Erro OTP button:", response.status, errorText);
+
+      // Último fallback: botões simples
+      console.log("🔄 Tentando botões simples...");
+      await sendPixWithSimpleButtons(phone, pixCode);
+    }
+  } catch (error) {
+    console.error("❌ Erro OTP button:", error);
+    await sendPixWithSimpleButtons(phone, pixCode);
+  }
+}
+
+// Função alternativa com botões simples (mais estável segundo documentação)
+async function sendPixWithSimpleButtons(phone: string, pixCode: string) {
+  try {
+    console.log("🔄 Tentando botões simples (mais estável)");
+
+    const zapiUrl =
+      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-list";
+
+    const message = `🟢 **PIX GERADO COM SUCESSO!**
+
+💰 **Valor:** R$ 10.00
+📝 **Pagamento Tivius**
+
+📋 **Escolha uma opção:**`;
+
+    const requestBody = {
+      phone: phone,
+      message: message,
+      footer: "💡 Código PIX disponível",
+      buttons: [
+        {
+          id: "copy_pix",
+          text: "📋 Ver Código PIX",
+        },
+        {
+          id: "help",
+          text: "❓ Como Pagar",
+        },
+      ],
+    };
+
+    console.log("📤 Enviando botões simples");
+
+    const headers = {
+      "Content-Type": "application/json",
+      "Client-Token":
+        process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
+    };
+
+    const response = await fetch(zapiUrl, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log("📥 Status botões simples:", response.status);
+
+    if (response.ok) {
+      const responseData = await response.json();
+      console.log("✅ Botões simples enviados:", responseData);
+
+      // Enviar o código PIX logo em seguida
+      setTimeout(() => {
+        sendPixCodeMessage(phone, pixCode);
+      }, 2000);
+    } else {
+      const errorText = await response.text();
+      console.error("❌ Erro botões simples:", response.status, errorText);
+
+      // Último fallback: mensagem simples
+      console.log("🔄 Usando fallback final...");
       await sendPixCodeMessage(phone, pixCode);
     }
   } catch (error) {
-    console.error("❌ Erro ao enviar código com botão:", error);
-    // Fallback: enviar código como texto simples
+    console.error("❌ Erro botões simples:", error);
+    // Último fallback
     await sendPixCodeMessage(phone, pixCode);
   }
 }

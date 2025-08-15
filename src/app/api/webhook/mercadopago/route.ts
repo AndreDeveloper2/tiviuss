@@ -285,7 +285,7 @@ async function sendPixInfoMessage(phone: string, pixData: PixPaymentResponse) {
   }
 }
 
-// Função para enviar código PIX com botão de copiar
+// Função CORRIGIDA para enviar código PIX com botão de copiar
 async function sendPixCodeWithButton(phone: string, pixCode: string) {
   try {
     const zapiUrl =
@@ -295,27 +295,31 @@ async function sendPixCodeWithButton(phone: string, pixCode: string) {
 
 Clique no botão abaixo para copiar automaticamente:`;
 
-    // Criar URL para copiar PIX (conforme documentação Z-API)
+    // CORREÇÃO: Usar a URL correta do WhatsApp para copiar código
     const copyUrl = `https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=${encodeURIComponent(
       pixCode
     )}`;
 
-    // Dados para enviar apenas 1 botão (conforme observação da documentação)
+    // CORREÇÃO: Estrutura correta do payload conforme documentação Z-API
     const requestBody = {
       phone: phone,
       message: message,
       buttonActions: [
         {
-          type: "URL",
-          phone: phone,
-          url: copyUrl,
-          label: "📋 Copiar PIX",
+          type: "URL", // Tipo correto
+          url: copyUrl, // URL para copiar
+          label: "📋 Copiar PIX", // Texto do botão
+          // Removido o campo 'phone' que não é necessário para tipo URL
         },
       ],
+      // ADICIONADO: Campos opcionais que podem ajudar
+      title: "PIX Copia e Cola", // Título opcional
+      footer: "Toque no botão para copiar", // Rodapé opcional
     };
 
     console.log("📤 Enviando código PIX com botão de copiar");
     console.log("🔗 URL de cópia:", copyUrl);
+    console.log("📋 Payload completo:", JSON.stringify(requestBody, null, 2));
 
     const headers = {
       "Content-Type": "application/json",
@@ -337,7 +341,11 @@ Clique no botão abaixo para copiar automaticamente:`;
     } else {
       const errorText = await response.text();
       console.error("❌ Erro ao enviar botão:", response.status, errorText);
+      console.error("❌ Headers enviados:", headers);
+      console.error("❌ Body enviado:", JSON.stringify(requestBody, null, 2));
+
       // Fallback: enviar código como texto simples
+      console.log("🔄 Tentando fallback...");
       await sendPixCodeMessage(phone, pixCode);
     }
   } catch (error) {

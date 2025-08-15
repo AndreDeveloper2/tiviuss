@@ -197,9 +197,6 @@ async function createMercadoPagoPix(): Promise<PixPaymentResponse> {
 // Função para enviar PIX via Z-API com botão de copiar
 async function sendPixViaZApi(phone: string, pixData: PixPaymentResponse) {
   try {
-    const zapiUrl =
-      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-actions";
-
     // Formatar número de telefone corretamente
     let formattedPhone = phone;
     if (phone) {
@@ -213,6 +210,30 @@ async function sendPixViaZApi(phone: string, pixData: PixPaymentResponse) {
 
     console.log("📱 Enviando PIX para:", formattedPhone);
 
+    // Primeira mensagem: Informações do PIX
+    await sendPixInfoMessage(formattedPhone, pixData);
+
+    // Segunda mensagem: Código PIX com botão de copiar
+    await sendPixCodeWithButton(
+      formattedPhone,
+      pixData.point_of_interaction.transaction_data.qr_code
+    );
+  } catch (error) {
+    console.error("❌ Erro ao enviar PIX via Z-API:", error);
+    // Fallback: enviar mensagem simples
+    await sendPixCodeMessage(
+      phone,
+      pixData.point_of_interaction.transaction_data.qr_code
+    );
+  }
+}
+
+// Função para enviar informações do PIX
+async function sendPixInfoMessage(phone: string, pixData: PixPaymentResponse) {
+  try {
+    const zapiUrl =
+      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-text";
+
     const message = `🟢 **PIX GERADO COM SUCESSO!**
 
 💰 **Valor:** R$ ${pixData.transaction_amount.toFixed(2)}
@@ -223,46 +244,77 @@ async function sendPixViaZApi(phone: string, pixData: PixPaymentResponse) {
     )}
 
 💡 **Como pagar:**
-1. Clique em "📋 Copiar PIX" abaixo
+1. Clique no botão "Copiar PIX" na próxima mensagem
 2. Abra seu app bancário
-3. Escolha "PIX" → "Copia e Cola"
+3. Escolha PIX → Copia e Cola
 4. Cole o código e confirme
 
-✅ Após o pagamento, você receberá confirmação automática.`;
+✅ Você receberá confirmação quando o pagamento for aprovado!`;
+
+    const requestBody = {
+      phone: phone,
+      message: message,
+    };
+
+    console.log("📤 Enviando informações do PIX");
+
+    const headers = {
+      "Content-Type": "application/json",
+      "Client-Token":
+        process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
+    };
+
+    const response = await fetch(zapiUrl, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    if (response.ok) {
+      console.log("✅ Informações do PIX enviadas");
+    } else {
+      const errorText = await response.text();
+      console.error(
+        "❌ Erro ao enviar informações:",
+        response.status,
+        errorText
+      );
+    }
+  } catch (error) {
+    console.error("❌ Erro ao enviar informações do PIX:", error);
+  }
+}
+
+// Função para enviar código PIX com botão de copiar
+async function sendPixCodeWithButton(phone: string, pixCode: string) {
+  try {
+    const zapiUrl =
+      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-actions";
+
+    const message = `📋 **CÓDIGO PIX COPIA E COLA**
+
+Clique no botão abaixo para copiar automaticamente:`;
 
     // Criar URL para copiar PIX (conforme documentação Z-API)
-    const pixCode = pixData.point_of_interaction.transaction_data.qr_code;
     const copyUrl = `https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=${encodeURIComponent(
       pixCode
     )}`;
 
-    // Dados para enviar mensagem com botões de ação
+    // Dados para enviar apenas 1 botão (conforme observação da documentação)
     const requestBody = {
-      phone: formattedPhone,
+      phone: phone,
       message: message,
       buttonActions: [
         {
           type: "URL",
-          phone: formattedPhone, // Obrigatório
+          phone: phone,
           url: copyUrl,
           label: "📋 Copiar PIX",
-        },
-        {
-          type: "REPLY",
-          phone: formattedPhone, // Obrigatório
-          url: "", // Obrigatório (pode ser vazio para REPLY)
-          label: "🔍 Status",
-        },
-        {
-          type: "REPLY",
-          phone: formattedPhone, // Obrigatório
-          url: "", // Obrigatório (pode ser vazio para REPLY)
-          label: "❓ Ajuda",
         },
       ],
     };
 
-    console.log("📤 Enviando mensagem com botões de ação para Z-API");
+    console.log("📤 Enviando código PIX com botão de copiar");
     console.log("🔗 URL de cópia:", copyUrl);
 
     const headers = {
@@ -277,41 +329,21 @@ async function sendPixViaZApi(phone: string, pixData: PixPaymentResponse) {
       body: JSON.stringify(requestBody),
     });
 
-    console.log("📥 Status da resposta Z-API:", response.status);
-    console.log(
-      "📥 Headers da resposta Z-API:",
-      Object.fromEntries(response.headers.entries())
-    );
+    console.log("📥 Status da resposta Z-API (botão):", response.status);
 
     if (response.ok) {
       const responseData = await response.json();
-      console.log(
-        "✅ Mensagem com botões de ação enviada via Z-API:",
-        responseData
-      );
-
-      // Sempre enviar fallback também para garantir que chegue a mensagem
-      console.log(
-        "🔄 Enviando mensagem fallback adicional para garantir entrega"
-      );
-      await sendPixCodeMessage(formattedPhone, pixCode);
+      console.log("✅ Código PIX com botão enviado:", responseData);
     } else {
       const errorText = await response.text();
-      console.error("❌ Erro ao enviar via Z-API:", response.status, errorText);
-      console.error(
-        "❌ Request enviado:",
-        JSON.stringify(requestBody, null, 2)
-      );
-      // Fallback: enviar mensagem simples com código
-      await sendPixCodeMessage(formattedPhone, pixCode);
+      console.error("❌ Erro ao enviar botão:", response.status, errorText);
+      // Fallback: enviar código como texto simples
+      await sendPixCodeMessage(phone, pixCode);
     }
   } catch (error) {
-    console.error("❌ Erro ao enviar PIX via Z-API:", error);
-    // Fallback: enviar mensagem simples
-    await sendPixCodeMessage(
-      phone,
-      pixData.point_of_interaction.transaction_data.qr_code
-    );
+    console.error("❌ Erro ao enviar código com botão:", error);
+    // Fallback: enviar código como texto simples
+    await sendPixCodeMessage(phone, pixCode);
   }
 }
 

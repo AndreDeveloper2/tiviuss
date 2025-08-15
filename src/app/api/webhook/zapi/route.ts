@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Interface para os dados do PIX
-interface PixData {
-  pixKey: string;
-  amount: string;
+interface PixPaymentResponse {
+  id: number;
+  status: string;
+  transaction_amount: number;
   description: string;
-  pixCode: string;
-  expiresAt: string;
-  customerName: string;
-  transactionId: string;
+  payment_method_id: string;
+  payer: {
+    email: string;
+  };
+  point_of_interaction: {
+    transaction_data: {
+      qr_code_base64: string;
+      qr_code: string;
+      ticket_url: string;
+    };
+  };
+  date_created: string;
+  date_of_expiration: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -31,15 +40,32 @@ export async function POST(request: NextRequest) {
 
     // Se a mensagem contiver "pix" de qualquer uma das origens acima, gerar PIX
     if (normalizedText.includes("pix")) {
-      const pixData = generateFakePix();
-      await sendPixViaZApi(phoneFromPayload || "5511999999999", pixData);
+      try {
+        const pixPayment = await createMercadoPagoPix();
+        await sendPixViaZApi(phoneFromPayload || "5511999999999", pixPayment);
 
-      return NextResponse.json({
-        success: true,
-        message: "PIX gerado e enviado com sucesso",
-        pixData,
-        timestamp: new Date().toISOString(),
-      });
+        return NextResponse.json({
+          success: true,
+          message: "PIX gerado via Mercado Pago e enviado com sucesso",
+          pixData: {
+            id: pixPayment.id,
+            amount: pixPayment.transaction_amount,
+            status: pixPayment.status,
+            qr_code: pixPayment.point_of_interaction.transaction_data.qr_code,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error("Erro ao gerar PIX no Mercado Pago:", error);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Erro ao gerar PIX",
+            timestamp: new Date().toISOString(),
+          },
+          { status: 500 }
+        );
+      }
     }
 
     // Compatibilidade com o formato legado usado nos testes locais
@@ -47,18 +73,35 @@ export async function POST(request: NextRequest) {
     if (type === "text" && typeof message === "string") {
       const msg = message.toLowerCase();
       if (msg.includes("pix")) {
-        const pixData = generateFakePix();
-        await sendPixViaZApi(
-          customer?.phone || phoneFromPayload || "5511999999999",
-          pixData
-        );
+        try {
+          const pixPayment = await createMercadoPagoPix();
+          await sendPixViaZApi(
+            customer?.phone || phoneFromPayload || "5511999999999",
+            pixPayment
+          );
 
-        return NextResponse.json({
-          success: true,
-          message: "PIX gerado e enviado com sucesso",
-          pixData,
-          timestamp: new Date().toISOString(),
-        });
+          return NextResponse.json({
+            success: true,
+            message: "PIX gerado via Mercado Pago e enviado com sucesso",
+            pixData: {
+              id: pixPayment.id,
+              amount: pixPayment.transaction_amount,
+              status: pixPayment.status,
+              qr_code: pixPayment.point_of_interaction.transaction_data.qr_code,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error("Erro ao gerar PIX no Mercado Pago:", error);
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Erro ao gerar PIX",
+              timestamp: new Date().toISOString(),
+            },
+            { status: 500 }
+          );
+        }
       }
     }
 
@@ -88,93 +131,128 @@ export async function GET() {
   });
 }
 
-// Função para gerar PIX fictício
-function generateFakePix(): PixData {
-  const now = new Date();
-  const amount = Math.floor(Math.random() * 1000) + 50; // Valor entre R$ 50 e R$ 1050
+// Função para criar PIX no Mercado Pago
+async function createMercadoPagoPix(): Promise<PixPaymentResponse> {
+  const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
 
-  return {
-    pixKey: "tivius@email.com",
-    amount: amount.toFixed(2),
-    description: `Pagamento Tivius - ${now.toLocaleDateString("pt-BR")}`,
-    pixCode: generatePixCode(),
-    expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(), // Expira em 24h
-    customerName: "Cliente Tivius",
-    transactionId: `TIV${Date.now()}`,
-  };
-}
-
-// Função para gerar código PIX fictício
-function generatePixCode(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let result = "";
-  for (let i = 0; i < 32; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  if (!accessToken) {
+    throw new Error("Token de acesso do Mercado Pago não configurado");
   }
-  return result;
+
+  const amount = Math.floor(Math.random() * 1000) + 50; // Valor entre R$ 50 e R$ 1050
+  const transactionId = `TIV${Date.now()}`;
+
+  const paymentData = {
+    transaction_amount: amount,
+    description: `Pagamento Tivius - ${new Date().toLocaleDateString("pt-BR")}`,
+    payment_method_id: "pix",
+    external_reference: transactionId,
+    notification_url: `${
+      process.env.VERCEL_URL || "https://seu-dominio.vercel.app"
+    }/api/webhook/mercadopago`,
+    payer: {
+      email: "cliente@tivius.com",
+      first_name: "Cliente",
+      last_name: "Tivius",
+    },
+    date_of_expiration: new Date(
+      Date.now() + 24 * 60 * 60 * 1000
+    ).toISOString(), // Expira em 24h
+  };
+
+  console.log("📤 Criando PIX no Mercado Pago:", paymentData);
+
+  const response = await fetch("https://api.mercadopago.com/v1/payments", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+      "X-Idempotency-Key": transactionId, // Evita duplicação de pagamentos
+    },
+    body: JSON.stringify(paymentData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error(
+      "❌ Erro na API do Mercado Pago:",
+      response.status,
+      errorData
+    );
+    throw new Error(`Erro na API do Mercado Pago: ${response.status}`);
+  }
+
+  const pixPayment: PixPaymentResponse = await response.json();
+  console.log("✅ PIX criado no Mercado Pago:", pixPayment);
+
+  return pixPayment;
 }
 
-// Função para enviar PIX via Z-API
-async function sendPixViaZApi(phone: string, pixData: PixData) {
+// Função para enviar PIX via Z-API com botão de copiar
+async function sendPixViaZApi(phone: string, pixData: PixPaymentResponse) {
   try {
     const zapiUrl =
-      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-text";
+      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-button-list";
 
-    // Formatar número de telefone corretamente (apenas números, sem formatação)
+    // Formatar número de telefone corretamente
     let formattedPhone = phone;
     if (phone) {
-      // Remove todos os caracteres não numéricos
       formattedPhone = phone.replace(/\D/g, "");
-      // Se não começar com 55, adiciona
       if (!formattedPhone.startsWith("55")) {
         formattedPhone = `55${formattedPhone}`;
       }
     } else {
-      formattedPhone = "5511999999999"; // Número padrão para teste
+      formattedPhone = "5511999999999";
     }
 
     console.log("📱 Enviando PIX para:", formattedPhone);
-    console.log("🔗 URL Z-API:", zapiUrl);
 
     const message = `🟢 **PIX GERADO COM SUCESSO!**
 
-💰 **Valor:** R$ ${pixData.amount}
+💰 **Valor:** R$ ${pixData.transaction_amount.toFixed(2)}
 📝 **Descrição:** ${pixData.description}
-🆔 **ID da Transação:** ${pixData.transactionId}
-⏰ **Expira em:** ${new Date(pixData.expiresAt).toLocaleString("pt-BR")}
-
-📋 **Código PIX (Copie e Cole):**
-\`\`\`
-${pixData.pixCode}
-\`\`\`
+🆔 **ID do Pagamento:** ${pixData.id}
+⏰ **Expira em:** ${new Date(pixData.date_of_expiration).toLocaleString(
+      "pt-BR"
+    )}
 
 💡 **Como pagar:**
-1. Abra seu app bancário
-2. Escolha "PIX"
-3. Cole o código acima
-4. Confirme o pagamento
+1. Clique em "📋 Copiar PIX" abaixo
+2. Abra seu app bancário
+3. Escolha "PIX" → "Copia e Cola"
+4. Cole o código e confirme
 
-✅ Após o pagamento, você receberá uma confirmação automática.
+✅ Após o pagamento, você receberá confirmação automática.`;
 
-Dúvidas? Digite "atendente" para falar conosco.`;
-
+    // Dados para enviar mensagem com botões
     const requestBody = {
       phone: formattedPhone,
       message: message,
+      buttonList: {
+        buttons: [
+          {
+            id: "copy_pix",
+            title: "📋 Copiar PIX",
+          },
+          {
+            id: "check_status",
+            title: "🔍 Verificar Status",
+          },
+          {
+            id: "help",
+            title: "❓ Ajuda",
+          },
+        ],
+      },
     };
 
-    console.log(
-      "📤 Dados enviados para Z-API:",
-      JSON.stringify(requestBody, null, 2)
-    );
+    console.log("📤 Enviando mensagem com botões para Z-API");
 
-    // Headers baseados na documentação oficial
     const headers = {
       "Content-Type": "application/json",
-      // Client-Token é obrigatório conforme erro da API
       "Client-Token":
         process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
-    } as Record<string, string>;
+    };
 
     const response = await fetch(zapiUrl, {
       method: "POST",
@@ -183,42 +261,63 @@ Dúvidas? Digite "atendente" para falar conosco.`;
     });
 
     console.log("📥 Status da resposta Z-API:", response.status);
-    console.log(
-      "📥 Headers da resposta:",
-      Object.fromEntries(response.headers.entries())
-    );
 
     if (response.ok) {
       const responseData = await response.json();
-      console.log("✅ PIX enviado via Z-API com sucesso:", responseData);
-      // Verificar se a resposta contém os campos esperados
-      if (responseData.zaapId || responseData.messageId || responseData.id) {
-        console.log("✅ Resposta válida do Z-API:", {
-          zaapId: responseData.zaapId,
-          messageId: responseData.messageId,
-          id: responseData.id,
-        });
-      } else {
-        console.warn("⚠️ Resposta inesperada do Z-API:", responseData);
-      }
+      console.log("✅ Mensagem com botões enviada via Z-API:", responseData);
+
+      // Enviar o código PIX separadamente para facilitar a cópia
+      await sendPixCodeMessage(
+        formattedPhone,
+        pixData.point_of_interaction.transaction_data.qr_code
+      );
     } else {
       const errorText = await response.text();
-      console.error(
-        "❌ Erro ao enviar PIX via Z-API:",
-        response.status,
-        response.statusText
-      );
-      console.error("❌ Resposta de erro:", errorText);
-      // Tratamento específico de erros baseado na documentação
-      if (response.status === 405) {
-        console.error(
-          "❌ Erro 405: Verifique se está usando o método POSTT corretamente"
-        );
-      } else if (response.status === 415) {
-        console.error("❌ Erro 415: Verifique se o Content-Type está correto");
-      }
+      console.error("❌ Erro ao enviar via Z-API:", response.status, errorText);
     }
   } catch (error) {
     console.error("❌ Erro ao enviar PIX via Z-API:", error);
+  }
+}
+
+// Função para enviar o código PIX separadamente
+async function sendPixCodeMessage(phone: string, pixCode: string) {
+  try {
+    const zapiUrl =
+      "https://api.z-api.io/instances/3E5B6CA5E4C6D09F694EAEF0CD5229F7/token/5EB75083B0368AAAC6083A84/send-text";
+
+    const message = `📋 **CÓDIGO PIX (TOQUE E SEGURE PARA COPIAR)**
+
+\`\`\`${pixCode}\`\`\`
+
+💡 **Dica:** Toque e segure no código acima para copiá-lo rapidamente!
+
+🔄 Digite "status" para verificar o pagamento
+❓ Digite "ajuda" se precisar de suporte`;
+
+    const requestBody = {
+      phone: phone,
+      message: message,
+    };
+
+    const headers = {
+      "Content-Type": "application/json",
+      "Client-Token":
+        process.env.ZAPI_CLIENT_TOKEN || "F519caa90c16e4e738d4f596c9222d2cbS",
+    };
+
+    const response = await fetch(zapiUrl, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    if (response.ok) {
+      console.log("✅ Código PIX enviado separadamente");
+    } else {
+      console.error("❌ Erro ao enviar código PIX");
+    }
+  } catch (error) {
+    console.error("❌ Erro ao enviar código PIX:", error);
   }
 }

@@ -116,9 +116,9 @@ const TiviusFAQ = () => {
       id: 8,
       question: "Quanto custa? Tem taxa de instalação?",
       answer:
-        "Temos planos a partir de R$ 39,90/mês. Zero taxa de instalação, zero taxa de adesão. O preço que você vê é o preço que você paga, sem pegadinhas!",
+        "Temos planos a partir de R$ 40,00/mês. Zero taxa de instalação, zero taxa de adesão. O preço que você vê é o preço que você paga, sem pegadinhas!",
       icon: "💰",
-      keywords: "preço tivius 39,90 sem taxa instalação custo",
+      keywords: "preço tivius 40,00 sem taxa instalação custo",
     },
   ];
 
